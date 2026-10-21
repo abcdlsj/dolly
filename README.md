@@ -94,11 +94,25 @@ $ scripts/camera.py --input take.mp4 --out push-in.mp4 \
 {"ok":true,"source":[2560,1600],"ceiling":1.481,"zoom":[1.0,1.0,1.28],"clamped":false,...}
 ```
 
-`t:zoom:x:y` — `zoom` is the magnification, `x`/`y` the normalised point of the
-window kept at the centre. The window is first padded (`--fit pad`, default)
-or cropped (`--fit crop`) to 16:9; beyond `ceiling` (that canvas's width ÷
-1920) the image would be upscaled, so zooms are clamped there and reported.
-`--strip` writes a five frame contact strip of the result.
+`t:zoom:x:y[:ease]` — `zoom` is the magnification, `x`/`y` the normalised point
+of the window kept at the centre. The camera follows a monotone spline through
+the keyframes (zoom eases by ratio, so a push-in looks even), and a move through several
+keyframes never stalls on the middle ones. The window is first padded
+(`--fit pad`, default) or cropped (`--fit crop`) to the output aspect
+(`--aspect 16:9`, `9:16`, `1:1`, `4:5`); beyond `ceiling` (that canvas's width
+÷ output width) the image would be upscaled, so zooms are clamped there and
+reported. `--strip` writes a five frame contact strip of the result.
+
+Named moves save the arithmetic. A shot file lists beats — `focus` on a
+control's rect, `pan-to`, `punch-in`, `drift`, `tour`, `pull-back` — and
+`--explain` prints the keyframes they expand to, with warnings for moves that
+start too early, run too fast or hit the ceiling:
+
+```console
+$ scripts/camera.py --shot shot.json --explain
+{"ok":true,"keys":["0.000:1.000:0.500:0.500:spline",...],"peak_pan":0.21,"warnings":[]}
+$ scripts/camera.py --shot shot.json --strip strip.jpg
+```
 
 `python3 -m unittest discover tests` renders synthetic takes of several window
 shapes and checks size, frame count and where the camera lands (needs ffmpeg).

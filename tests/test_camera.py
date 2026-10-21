@@ -19,6 +19,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCRIPT = os.path.join(ROOT, "scripts", "camera.py")
 spec = importlib.util.spec_from_file_location("camera", SCRIPT)
 camera = importlib.util.module_from_spec(spec)
+sys.modules["camera"] = camera  # dataclasses look their module up by name
 spec.loader.exec_module(camera)
 
 HAS_FFMPEG = shutil.which("ffmpeg") is not None and shutil.which("ffprobe") is not None
@@ -95,7 +96,7 @@ class Geometry(unittest.TestCase):
 
     def test_start_does_not_shift_keyframes(self):
         graph = camera.build_filter(
-            [(0.0, 1.0, 0.5, 0.5), (1.0, 1.3, 0.5, 0.5)], (2560, 1600), 1.0, None, 1.333,
+            [camera.Key(0.0, 1.0), camera.Key(1.0, 1.3)], (2560, 1600), 1.0, None, 1.333,
         )
         self.assertIn("trim=start=1.0", graph)
         self.assertIn("lt(t,1.0000)", graph)
@@ -106,6 +107,111 @@ class Geometry(unittest.TestCase):
             for index in range(20):
                 open(os.path.join(directory, f"{1_700_000_000_000 + index * 16}.png"), "wb").close()
             self.assertAlmostEqual(camera.frame_rate(directory), 62.5, places=1)
+
+
+class Curves(unittest.TestCase):
+    def build(self, keys):
+        return camera.Camera.build(keys, (2560, 1600), "pad", 1.481, (1920, 1080))
+
+    def test_two_keyframes_are_a_smoothstep(self):
+        path = self.build([camera.Key(0, 1.0, 0.4, 0.5), camera.Key(2, 1.0, 0.6, 0.5)])
+        start = path.x.at(0)
+        end = path.x.at(2)
+        for t in (0.5, 1.0, 1.5):
+            u = t / 2
+            self.assertAlmostEqual(path.x.at(t), start + (end - start) * u * u * (3 - 2 * u), places=6)
+
+    def test_a_move_through_a_keyframe_does_not_stall_there(self):
+        path = self.build([camera.Key(0, 1.2, 0.3, 0.5), camera.Key(1, 1.2, 0.5, 0.5),
+                           camera.Key(2, 1.2, 0.7, 0.5)])
+        speed = (path.x.at(1.01) - path.x.at(0.99)) / 0.02
+        self.assertGreater(speed, 0.1)
+
+    def test_a_repeated_keyframe_holds(self):
+        path = self.build([camera.Key(0, 1.0, 0.3, 0.5), camera.Key(1, 1.0, 0.5, 0.5),
+                           camera.Key(1.5, 1.0, 0.5, 0.5), camera.Key(2.5, 1.0, 0.7, 0.5)])
+        self.assertAlmostEqual(path.x.at(1.0), path.x.at(1.5), places=9)
+        self.assertAlmostEqual(path.x.at(1.25), path.x.at(1.0), places=9)
+
+    def test_spline_never_overshoots(self):
+        path = self.build([camera.Key(0, 1.0, 0.2, 0.5), camera.Key(0.3, 1.0, 0.6, 0.5),
+                           camera.Key(3, 1.0, 0.62, 0.5)])
+        peak = max(path.x.at(i / 100) for i in range(301))
+        self.assertLessEqual(peak, path.x.at(3) + 1e-9)
+
+    def test_zoom_eases_in_ratio(self):
+        path = self.build([camera.Key(0, 1.0), camera.Key(2, 1.44)])
+        self.assertAlmostEqual(path.view(1.0)[0], 1.2, places=6)
+
+    def test_ffmpeg_expression_matches_python(self):
+        path = self.build([camera.Key(0, 1.0, 0.3, 0.5), camera.Key(1, 1.2, 0.5, 0.5, "out"),
+                           camera.Key(2, 1.3, 0.7, 0.5, "back")])
+        expression = path.x.expression("T")
+        for t in (0.0, 0.3, 1.0, 1.4, 1.9, 2.5):
+            python = expression.replace("T", repr(t)).replace("if(", "_if(").replace("lt(", "_lt(")
+            python = python.replace("clip(", "_clip(")
+            value = eval(python, {"_if": lambda c, a, b: a if c else b, "_lt": lambda a, b: a < b,
+                                  "_clip": lambda v, lo, hi: min(max(v, lo), hi)})
+            self.assertAlmostEqual(value, path.x.at(t), places=5)
+
+    def test_keyframe_and_aspect_parsing(self):
+        self.assertEqual(camera.parse_keyframe("1:1.2:0.3:0.4:out").ease, "out")
+        self.assertEqual(camera.parse_keyframe("1:1.2").x, 0.5)
+        self.assertEqual(camera.parse_aspect("16:9"), (1920, 1080))
+        self.assertEqual(camera.parse_aspect("9:16"), (1080, 1920))
+        self.assertEqual(camera.parse_aspect("1:1"), (1080, 1080))
+        self.assertEqual(camera.parse_aspect("4:5"), (1080, 1350))
+
+
+class Shots(unittest.TestCase):
+    source = (2560, 1600)
+
+    def plan(self, beats, length=6.0):
+        ceiling = camera.ceiling_for(self.source, "pad")
+        return camera.plan_shot({"beats": beats}, self.source, "pad", ceiling, (1920, 1080), length)
+
+    def test_focus_fits_the_rect(self):
+        plan = self.plan([{"move": "focus", "at": 0.4, "rect": [0.4, 0.4, 0.2, 0.2], "fill": 0.25}])
+        last = plan.keys[-1]
+        # 0.2 of a 1600-high window is 320 px of a 1600 canvas; a quarter of the frame is zoom 1.25.
+        self.assertAlmostEqual(last.zoom, 0.25 * 1600 / 320, places=3)
+        self.assertAlmostEqual(last.x, 0.5)
+        self.assertAlmostEqual(last.y, 0.5)
+        self.assertEqual([k.t for k in plan.keys], [0.0, 0.4, 2.2])
+
+    def test_relative_and_end_times(self):
+        plan = self.plan([
+            {"move": "focus", "at": 0.5, "point": [0.3, 0.3], "zoom": 1.2},
+            {"move": "pan-to", "at": "+0.5", "point": [0.7, 0.3]},
+            {"move": "pull-back", "at": "end-2"},
+        ], length=8.0)
+        self.assertEqual([b.start for b in plan.beats], [0.5, 2.8, 6.0])
+        self.assertEqual(plan.keys[-1].zoom, 1.0)
+
+    def test_overlapping_beats_are_refused(self):
+        with self.assertRaises(camera.ShotError):
+            self.plan([{"move": "focus", "at": 0.5, "point": [0.3, 0.3]},
+                       {"move": "pan-to", "at": 1.0, "point": [0.7, 0.3]}])
+
+    def test_clamped_zoom_is_reported(self):
+        plan = self.plan([{"move": "focus", "at": 0.5, "point": [0.5, 0.5], "zoom": 3}])
+        self.assertTrue(plan.beats[0].clamped)
+        self.assertTrue(plan.warnings)
+
+    def test_tour_and_drift(self):
+        plan = self.plan([
+            {"move": "tour", "at": 0.4, "zoom": 1.2, "stops": [[0.3, 0.3], [0.7, 0.3]], "hold": 0.5},
+            {"move": "drift"},
+        ])
+        self.assertEqual([round(k.t, 2) for k in plan.keys], [0.0, 0.4, 1.6, 2.1, 3.3, 3.8, 6.0])
+        self.assertEqual(plan.keys[-1].ease, "linear")
+        self.assertAlmostEqual(plan.keys[-1].zoom, 1.2 * 1.04)
+
+    def test_review_flags_an_early_move(self):
+        plan = self.plan([{"move": "focus", "at": 0.0, "point": [0.5, 0.5], "zoom": 1.3}])
+        path = camera.Camera.build(plan.keys, self.source, "pad", 1.481, (1920, 1080))
+        warnings = camera.review(path, plan.keys, plan.beats, 6.0)["warnings"]
+        self.assertTrue(any("before the first move" in w for w in warnings))
 
 
 @unittest.skipUnless(HAS_FFMPEG, "needs ffmpeg")
@@ -166,6 +272,32 @@ class Render(unittest.TestCase):
             return sum(1 for i in range(0, len(raw), 3) if raw[i] > 160 and raw[i + 1] < 100)
 
         self.assertGreater(red(large), red(small) * 1.4)
+
+    def test_portrait_output(self):
+        take = self.path("take.mp4")
+        make_take(take, (2560, 1600), (0.5, 0.5), seconds=1.0)
+        out = self.path("story.mp4")
+        result = run("--input", take, "--out", out, "--aspect", "9:16", "--keys", "0:1.0", "0.8:1.5")
+        self.assertEqual(result["output"], [1080, 1920])
+        info = stream(out)
+        self.assertEqual((info["width"], info["height"]), (1080, 1920))
+
+    def test_shot_lands_on_the_rect(self):
+        take = self.path("take.mp4")
+        make_take(take, (2560, 1600), (0.6, 0.55), seconds=3.0)
+        shot = self.path("shot.json")
+        with open(shot, "w", encoding="utf-8") as handle:
+            json.dump({"source": "take.mp4", "out": "shot.mp4", "beats": [
+                {"move": "hold", "for": 0.4},
+                {"move": "focus", "rect": [0.55, 0.5, 0.1, 0.1], "fill": 0.2, "for": 1.2},
+            ]}, handle)
+        explain = run("--shot", shot, "--explain")
+        self.assertEqual(len(explain["keys"]), 3)
+        result = run("--shot", shot)
+        self.assertTrue(os.path.exists(result["out"]))
+        x, y = marker_at(result["out"], 2.5)
+        self.assertAlmostEqual(x, 0.5, delta=0.02)
+        self.assertAlmostEqual(y, 0.5, delta=0.02)
 
     def test_start_trims_the_take(self):
         take = self.path("take.mp4")
