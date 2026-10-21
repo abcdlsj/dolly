@@ -64,6 +64,30 @@ enum Accessibility {
         }
     }
 
+    /// Resizes an app's main window: a film wants a big canvas so split panes
+    /// still read.
+    static func resize(pid: pid_t, width: Double, height: Double) throws {
+        guard let window = mainWindow(pid: pid) else {
+            throw Failure("no window for pid \(pid)", code: .failed)
+        }
+        var size = CGSize(width: width, height: height)
+        guard let axial = AXValueCreate(.cgSize, &size) else {
+            throw Failure("cannot build a size", code: .failed)
+        }
+        let result = AXUIElementSetAttributeValue(window, kAXSizeAttribute as CFString, axial)
+        guard result == .success else {
+            throw Failure("cannot resize window: AXError \(result.rawValue)", code: .failed)
+        }
+    }
+
+    private static func mainWindow(pid: pid_t) -> AXUIElement? {
+        let app = AXUIElementCreateApplication(pid)
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(app, kAXWindowsAttribute as CFString, &value) == .success,
+              let windows = value as? [AXUIElement] else { return nil }
+        return windows.first
+    }
+
     /// Moves an app's main window, so a recording can happen on a display
     /// nothing else is using.
     static func place(pid: pid_t, at point: Point) throws {

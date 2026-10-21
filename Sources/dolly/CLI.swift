@@ -114,6 +114,7 @@ enum Registry {
         Type.spec,
         Press.spec,
         Place.spec,
+        Resize.spec,
         Focus.spec,
         Dump.spec,
         Find.spec,

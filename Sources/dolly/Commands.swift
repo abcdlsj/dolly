@@ -309,6 +309,25 @@ enum Place {
     }
 }
 
+enum Resize {
+    static let name = "resize"
+    static let summary = "resize an app's window"
+    static let usage = "dolly resize <pid> <width> <height>"
+    static let spec = Command(name: name, summary: summary, usage: usage, run: run)
+
+    static func run(_ args: Args) throws -> [String: Any] {
+        try Shared.requireTrust()
+        guard let pid = args.positional[safe: 0].flatMap(Int32.init),
+              let width = args.positional[safe: 1].flatMap(Double.init),
+              let height = args.positional[safe: 2].flatMap(Double.init) else {
+            throw Failure("expected a pid, a width and a height")
+        }
+        try Accessibility.resize(pid: pid, width: width, height: height)
+        Thread.sleep(forTimeInterval: 0.3)
+        return ["pid": Int(pid), "width": width, "height": height]
+    }
+}
+
 enum Dump {
     static let name = "controls"
     static let summary = "list controls by role, to aim a press"
