@@ -53,24 +53,61 @@ a glitch, and five seconds of one static frame reads as a crash.
 Camera moves are post, never zoomed UI: crop a 2x take, ease the crop, keep the
 text at native resolution.
 
-Vocabulary, with numbers that hold up:
+Write a shot as named moves in a shot file and let `camera.py` turn them into
+keyframes. Coordinates are window-normalised (0..1), `rect` is `[x, y, w, h]`.
 
-| move | keyframes | note |
+| move | what it does | fields (defaults) |
 | --- | --- | --- |
-| push in | `0:1.0:0.5:0.5` → `2.4:1.28:0.3:0.42` | 1.5–2.5 s, ends on the detail |
-| hold | same values twice, ~0.5 s apart | a beat inside the move |
-| pan | zoom fixed, `x`/`y` change 0.2–0.4 | 1.2–2.0 s |
-| pull back | reverse of a push-in | lands on the whole window |
-| re-frame | `zoom` and centre move together | only when the beat changes |
+| `hold` | stay put | `for` (0.5) |
+| `focus` | push in on a control; with `rect` the zoom is chosen so it fills `fill` of the frame | `rect` or `point`, `fill` (0.5), `zoom`, `for` (1.8) |
+| `frame` | re-frame: zoom and centre move together | `point`/`rect`, `zoom` (1.28), `for` (1.6) |
+| `pan-to` | keep the zoom, move the centre | `point`/`rect`, `for` (1.4) |
+| `pull-back` | back to the whole window | `for` (1.6) |
+| `punch-in` | a short emphasis push with a small overshoot | `amount` (1.12), `point`, `for` (0.35), ease `back` |
+| `drift` | a slow linear creep on a long static beat | `amount` (1.04), `for` (until the next beat) |
+| `tour` | visit several points without stopping between holds | `stops`, `zoom`, `travel` (1.2), `hold` (0.8) |
+
+Every beat takes `at` — seconds, `"+0.6"` after the previous beat, or
+`"end-2"` from the end of the take; left out, it follows the previous beat
+directly. Any beat may set `ease`: `spline` (default), `smooth`, `out`, `in`,
+`linear`, `back`.
+
+```json
+{
+  "source": "take.mov",
+  "out": "film.mp4",
+  "output": { "aspect": "16:9", "fit": "pad" },
+  "beats": [
+    { "move": "hold", "for": 0.4 },
+    { "move": "focus", "rect": [0.08, 0.2, 0.22, 0.06], "fill": 0.45 },
+    { "move": "pan-to", "at": "+0.8", "point": [0.6, 0.3] },
+    { "move": "pull-back", "at": "end-2" }
+  ]
+}
+```
+
+```console
+$ scripts/camera.py --shot shot.json --explain   # keyframes, peak speeds, warnings — no render
+$ scripts/camera.py --shot shot.json --strip strip.jpg
+```
+
+Run `--explain` first and fix every warning: it checks the stillness at both
+ends, beats closer than 1.5 s, pans faster than 0.8 frame widths a second, and
+zooms clamped at the ceiling. Raw keyframes still work for anything the moves
+do not cover: `--keys t:zoom:x:y[:ease]`.
 
 Rules:
 
-- **Ceiling.** `camera.py` reports `ceiling` = source width ÷ 1920 (1.333 for a
-  2x capture of a 1280-wide window). Asking for more clamps and says so; text
-  beyond it goes soft. Need a deeper push? record a bigger window, not a
-  bigger zoom.
-- **Ease everything.** smoothstep is the default and the right one; a linear
-  move reads as a cut. Never start a move on the first frame of a cut and never
+- **Ceiling.** `camera.py` brings the window onto a canvas of the output aspect
+  (`--fit pad` letterboxes, `--fit crop` trims) and reports `ceiling` = canvas
+  width ÷ output width; for 16:9:
+  a 2x capture of a 1280×800 window gives 1.481 padded, 1.333 cropped. Asking
+  for more clamps and says so; text beyond it goes soft. A window under 960 pt
+  wide reports `upscaled` and only renders at zoom 1. Need a deeper push?
+  record a bigger window, not a bigger zoom.
+- **Ease everything.** The default spline starts and stops softly and glides
+  through keyframes in between; repeat a keyframe to stop there. A linear move
+  reads as a cut — keep `linear` for `drift`. Never start a move on the first frame of a cut and never
   end one on the last — leave 0.3–0.6 s of stillness at both ends.
 - **Move with the content, not instead of it.** Start the push-in on the frame
   the hover appears, so the move explains the change.
@@ -78,10 +115,9 @@ Rules:
 - **Anchor the subject.** `x`,`y` is the point that stays in the middle; aim it
   at the label or row the voice-over names, not the window's centre.
 
-```console
-$ scripts/camera.py --input take.mp4 --out push-in.mp4 \
-    --keys 0:1.0:0.5:0.5 0.5:1.02:0.42:0.5 2.8:1.28:0.2:0.4 --strip strip.jpg
-```
+- **Other formats.** `--aspect 9:16` (or `"output": {"aspect": "9:16"}`)
+  renders a vertical cut for social posts; `1:1` and `4:5` work the same way,
+  short side 1080.
 
 Check the strip before trusting the move: five frames, evenly spaced, showing
 the start, the travel and the landing.

@@ -5,3 +5,4 @@
 *.mov
 *.png
 *.jpg
+__pycache__/
