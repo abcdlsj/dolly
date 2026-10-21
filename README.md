@@ -1,3 +1,5 @@
+<img src="assets/icon.svg" width="96" alt="Dolly">
+
 # dolly
 
 Pointer, keyboard and accessibility input for screen recordings on macOS, plus
@@ -105,6 +107,12 @@ and the recording workflow.
 `Sources/dolly/Commands.swift` holds one `enum` per verb with a `spec` line; add
 the enum, add its `spec` to `Registry.all` in `CLI.swift`, done. Shared
 behaviour (travel, easing, guard, trust) lives in `Input.swift` and `CLI.swift`.
+
+## Icon
+
+`assets/` holds the mark: `icon.svg` (full bleed), `icon-dark.svg`,
+`icon-small.svg` (simplified for 32 px and below) and `AppIcon.svg` on the
+macOS 1024/824 grid, which `AppIcon.icns` is rendered from.
 
 ## Licence
 
