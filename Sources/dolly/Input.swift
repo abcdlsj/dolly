@@ -62,11 +62,19 @@ struct Point {
 final class Poster {
     private let source = CGEventSource(stateID: .hidSystemState)
     private(set) var cursor: Point
+    /// AppKit's drag machinery expects each event to carry a new number;
+    /// events that all share number 0 are treated as repeats of one gesture.
+    private var eventNumber: Int64 = 0
 
     init() {
         let location = CGEvent(source: nil)?.location ?? .zero
         cursor = Point(x: location.x, y: location.y)
         CGAssociateMouseAndMouseCursorPosition(1)
+    }
+
+    private func nextNumber() -> Int64 {
+        eventNumber += 1
+        return eventNumber
     }
 
     func move(to point: Point) {
@@ -80,6 +88,7 @@ final class Poster {
         ) else { return }
         event.setIntegerValueField(.mouseEventDeltaX, value: deltaX)
         event.setIntegerValueField(.mouseEventDeltaY, value: deltaY)
+        event.setIntegerValueField(.mouseEventNumber, value: nextNumber())
         event.post(tap: .cghidEventTap)
         cursor = point
     }
@@ -103,6 +112,7 @@ final class Poster {
         ) else { return }
         event.setIntegerValueField(.mouseEventDeltaX, value: deltaX)
         event.setIntegerValueField(.mouseEventDeltaY, value: deltaY)
+        event.setIntegerValueField(.mouseEventNumber, value: nextNumber())
         event.post(tap: .cghidEventTap)
         cursor = point
     }
@@ -148,6 +158,7 @@ final class Poster {
             mouseButton: kind
         ) else { return }
         event.setIntegerValueField(.mouseEventClickState, value: clicks)
+        event.setIntegerValueField(.mouseEventNumber, value: nextNumber())
         event.post(tap: .cghidEventTap)
     }
 }

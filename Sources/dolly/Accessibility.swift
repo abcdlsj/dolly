@@ -32,6 +32,58 @@ enum Accessibility {
         return found
     }
 
+    /// Brings an app forward through accessibility. `NSRunningApplication` and
+    /// System Events both go through LaunchServices, which refuses for a binary
+    /// that is not a registered app bundle; AX activation works for any process
+    /// that has a window.
+    static func activate(pid: pid_t) throws {
+        let app = AXUIElementCreateApplication(pid)
+        let error = AXUIElementSetAttributeValue(
+            app,
+            kAXFrontmostAttribute as CFString,
+            kCFBooleanTrue
+        )
+        guard error == .success else {
+            throw Failure("cannot focus pid \(pid): AXError \(error.rawValue)", code: .failed)
+        }
+    }
+
+    /// Every control AX exposes under a pid, for aiming a press when the exact
+    /// label is unknown.
+    static func controls(pid: pid_t, role: String) -> [String] {
+        var found: [AXUIElement] = []
+        collect(AXUIElementCreateApplication(pid), depth: 0, role: role, into: &found)
+        return found.map(describe)
+    }
+
+    private static func collect(_ element: AXUIElement, depth: Int, role: String, into found: inout [AXUIElement]) {
+        guard depth < 80, found.count < 400 else { return }
+        if string(element, kAXRoleAttribute) == role { found.append(element) }
+        for child in children(element) {
+            collect(child, depth: depth + 1, role: role, into: &found)
+        }
+    }
+
+    /// Moves an app's main window, so a recording can happen on a display
+    /// nothing else is using.
+    static func place(pid: pid_t, at point: Point) throws {
+        let app = AXUIElementCreateApplication(pid)
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(app, kAXWindowsAttribute as CFString, &value) == .success,
+              let windows = value as? [AXUIElement],
+              let window = windows.first else {
+            throw Failure("no window for pid \(pid)", code: .failed)
+        }
+        var position = CGPoint(x: point.x, y: point.y)
+        guard let axial = AXValueCreate(.cgPoint, &position) else {
+            throw Failure("cannot build a point", code: .failed)
+        }
+        let result = AXUIElementSetAttributeValue(window, kAXPositionAttribute as CFString, axial)
+        guard result == .success else {
+            throw Failure("cannot move window: AXError \(result.rawValue)", code: .failed)
+        }
+    }
+
     static func describe(_ element: AXUIElement) -> String {
         [kAXRoleAttribute, kAXTitleAttribute, kAXDescriptionAttribute]
             .compactMap { string(element, $0) }

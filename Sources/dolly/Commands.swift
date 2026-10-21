@@ -169,7 +169,7 @@ enum Click {
 enum Drag {
     static let name = "drag"
     static let summary = "press, travel while held, release (starts real drag sessions)"
-    static let usage = "dolly drag <x,y> <x,y> [--via x,y] [--ms n] [--hold 0.6] [--guard app]"
+    static let usage = "dolly drag <x,y> <x,y> [--via x,y] [--ms n] [--hold 0.6] [--press-hold 0.25] [--guard app]"
     static let spec = Command(name: name, summary: summary, usage: usage, run: run)
 
     static func run(_ args: Args) throws -> [String: Any] {
@@ -181,14 +181,22 @@ enum Drag {
 
         let poster = Shared.poster()
         Travel.run(poster, through: [start], milliseconds: args.int("approach-ms", 450), ease: .inOut)
-        Timing.hold(0.15)
+        try Shared.guardOwner(args)
+        Timing.hold(args.double("settle", 0.2))
         poster.press()
-        Timing.hold(0.08)
+        // Holding still first is what makes a view start a drag session
+        // instead of reading the press as a click.
+        Timing.hold(args.double("press-hold", 0.25))
 
-        // Past the platform's drag threshold before the eased leg, otherwise
-        // the press is read as a click.
-        poster.drag(to: Point(x: start.x + 4, y: start.y + 4))
-        Timing.hold(0.05)
+        // Cross the platform's drag threshold (5 pt on AppKit) slowly and in
+        // the direction of travel, the way a hand does.
+        let span = max(start.distance(to: destination), 1)
+        let nudge = Point(
+            x: start.x + (destination.x - start.x) / span * 9,
+            y: start.y + (destination.y - start.y) / span * 9
+        )
+        Travel.run(poster, through: [nudge], milliseconds: 160, ease: .out, dragging: true)
+        Timing.hold(0.08)
 
         let hold = args.double("hold", 0.6)
         let travel = Timing.milliseconds(args, 900)
@@ -283,6 +291,58 @@ enum Press {
         }
         try Accessibility.press(pid: pid, label: label)
         return ["pid": Int(pid), "label": label]
+    }
+}
+
+enum Place {
+    static let name = "place"
+    static let summary = "move an app's window to a screen point"
+    static let usage = "dolly place <pid> <x,y>"
+    static let spec = Command(name: name, summary: summary, usage: usage, run: run)
+
+    static func run(_ args: Args) throws -> [String: Any] {
+        try Shared.requireTrust()
+        guard let pid = args.positional[safe: 0].flatMap(Int32.init) else {
+            throw Failure("expected a pid")
+        }
+        let point = try Parsing.point(args, startingAt: 1)
+        try Accessibility.place(pid: pid, at: point)
+        Thread.sleep(forTimeInterval: 0.3)
+        return ["pid": Int(pid), "x": point.x, "y": point.y]
+    }
+}
+
+enum Dump {
+    static let name = "controls"
+    static let summary = "list controls by role, to aim a press"
+    static let usage = "dolly controls <pid> [--role AXButton]"
+    static let spec = Command(name: name, summary: summary, usage: usage, run: run)
+
+    static func run(_ args: Args) throws -> [String: Any] {
+        guard let pid = args.positional[safe: 0].flatMap(Int32.init) else {
+            throw Failure("expected a pid")
+        }
+        let role = args.string("role") ?? "AXButton"
+        let controls = Accessibility.controls(pid: pid, role: role)
+        return ["role": role, "count": controls.count, "controls": controls]
+    }
+}
+
+enum Focus {
+    static let name = "focus"
+    static let summary = "bring an app to the front before typing into it"
+    static let usage = "dolly focus <pid>"
+    static let spec = Command(name: name, summary: summary, usage: usage, run: run)
+
+    static func run(_ args: Args) throws -> [String: Any] {
+        try Shared.requireTrust()
+        guard let pid = args.positional[safe: 0].flatMap(Int32.init) else {
+            throw Failure("expected a pid")
+        }
+        try Accessibility.activate(pid: pid)
+        Thread.sleep(forTimeInterval: args.double("settle", 0.2))
+        let front = FrontApp.describe()
+        return ["pid": Int(pid), "front": front?.pid ?? 0, "name": front?.name ?? ""]
     }
 }
 
@@ -383,6 +443,22 @@ enum Record {
 }
 
 // MARK: - help
+
+enum CaptureFilm {
+    static let name = "capture"
+    static let summary = "record one window as video, at the display's frame rate"
+    static let usage = "dolly capture <windowID> <out.mov> <seconds>"
+    static let spec = Command(name: name, summary: summary, usage: usage, run: run)
+
+    static func run(_ args: Args) throws -> [String: Any] {
+        guard let windowID = args.positional[safe: 0].flatMap(Int.init),
+              let file = args.positional[safe: 1].map({ URL(fileURLWithPath: $0) }),
+              let seconds = args.positional[safe: 2].flatMap(Double.init) else {
+            throw Failure("expected a window id, an output file and a duration")
+        }
+        return try Capture.video(windowID: windowID, file: file, seconds: seconds)
+    }
+}
 
 enum Help {
     static let name = "help"

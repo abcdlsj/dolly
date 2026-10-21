@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 
 /// Machine-first CLI plumbing: a declarative command table, uniform flag
@@ -112,11 +113,15 @@ enum Registry {
         Key.spec,
         Type.spec,
         Press.spec,
+        Place.spec,
+        Focus.spec,
+        Dump.spec,
         Find.spec,
         Front.spec,
         Windows.spec,
         Trust.spec,
         Record.spec,
+        CaptureFilm.spec,
         Help.spec,
     ]
 
@@ -144,6 +149,21 @@ enum Shared {
                 "refused: frontmost is \(front.name) (\(front.bundle), pid \(front.pid))",
                 code: .refused
             )
+        }
+    }
+
+    /// `--owner` names the app that must own the window under the pointer. It
+    /// covers the first click of a session, when the target is not frontmost
+    /// yet and a `--guard` would be wrong to demand.
+    static func guardOwner(_ args: Args) throws {
+        guard let owner = args.string("owner").flatMap(Int32.init) else { return }
+        let location = CGEvent(source: nil)?.location ?? .zero
+        let point = Point(x: Double(location.x), y: Double(location.y))
+        guard let window = WindowList.at(point) else {
+            throw Failure("refused: no window under the pointer", code: .refused)
+        }
+        guard window.pid == owner else {
+            throw Failure("refused: window under the pointer belongs to pid \(window.pid), not \(owner)", code: .refused)
         }
     }
 
@@ -187,6 +207,7 @@ enum Usage {
         lines.append("")
         lines.append("Shared flags:")
         lines.append("  --guard <pid|bundle|name>  refuse to run unless that app is frontmost")
+        lines.append("  --owner <pid>              refuse unless the window under the pointer is that app's")
         lines.append("  --ms <n>                   travel time in milliseconds (default 700)")
         lines.append("  --ease inOut|out|inQuint|linear")
         lines.append("")

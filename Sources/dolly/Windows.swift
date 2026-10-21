@@ -54,6 +54,17 @@ enum WindowList {
     static func front() -> WindowInfo? {
         list().first { $0.onScreen && $0.bounds.width > 1 }
     }
+
+    /// The frontmost window under a screen point: the one a click would land
+    /// on. Used to refuse input aimed at the wrong app.
+    static func at(_ point: Point) -> WindowInfo? {
+        list().first { window in
+            window.onScreen
+                && window.layer == 0
+                && window.bounds.contains(point.cg)
+                && window.bounds.width > 1
+        }
+    }
 }
 
 /// The largest on-screen window of an app, the usual target for a film: it is

@@ -4,6 +4,32 @@ import Foundation
 /// without stealing focus, and several loops in parallel lift the frame rate
 /// to something a camera move can be retimed from.
 enum Capture {
+    /// One window recorded as video, straight from `screencapture -v`. It
+    /// keeps the display's frame rate instead of the ~6 fps a still-image loop
+    /// reaches, which is what a camera move needs.
+    static func video(windowID: Int, file: URL, seconds: Double) throws -> [String: Any] {
+        guard let window = WindowList.list().first(where: { $0.id == windowID }) else {
+            throw Failure("no window \(windowID)", code: .failed)
+        }
+        let frame = window.bounds
+        let region = "\(Int(frame.origin.x)),\(Int(frame.origin.y)),\(Int(frame.width)),\(Int(frame.height))"
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+        process.arguments = ["-v", "-V", String(seconds), "-R", region, "-x", file.path]
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0, FileManager.default.fileExists(atPath: file.path) else {
+            throw Failure("screencapture failed for window \(windowID)", code: .failed)
+        }
+        return [
+            "window": windowID,
+            "file": file.path,
+            "region": region,
+            "source": ["width": Int(frame.width * 2), "height": Int(frame.height * 2)],
+        ]
+    }
+
     static func frames(
         windowID: Int,
         directory: URL,

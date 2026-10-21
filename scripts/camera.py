@@ -65,8 +65,10 @@ def build_filter(
     center_x = piecewise("cx", [(t, min(max(k[2], 0.0), 1.0)) for t, k in zip(times, keys)], (0.0, 1.0))
     center_y = piecewise("cy", [(t, min(max(k[3], 0.0), 1.0)) for t, k in zip(times, keys)], (0.0, 1.0))
 
+    # The crop keeps the output's 16:9, so the window's extra height is
+    # trimmed instead of squashed.
     width = f"({src_w:.0f}/({zoom}))"
-    height = f"({src_h:.0f}/({zoom}))"
+    height = f"({width}*{OUT_H}/{OUT_W})"
     left = f"min(max(({center_x})*{src_w:.0f}-{width}/2,0),{src_w:.0f}-{width})"
     top = f"min(max(({center_y})*{src_h:.0f}-{height}/2,0),{src_h:.0f}-{height})"
 
