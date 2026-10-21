@@ -9,8 +9,10 @@ of snapping.
     camera.py --input take.mp4 --out push-in.mp4 \
         --keys 0:1.0:0.5:0.5 0.4:1.0:0.5:0.5 2.6:1.28:0.18:0.34 --strip strip.jpg
 
-The source is captured at 2x, so the sharp ceiling is srcWidth/1920. Zoom
-beyond it is clamped and reported: upscaling makes text soft.
+The window is padded (or cropped) to a 16:9 canvas first, and the sharp
+ceiling is that canvas's width / 1920. Zoom beyond it is clamped and
+reported: upscaling makes text soft. A canvas under 1920 wide is reported as
+`upscaled` and renders at zoom 1 only.
 """
 
 from __future__ import annotations
@@ -52,6 +54,31 @@ def piecewise(name: str, keys: list[tuple[float, float]], limit: tuple[float, fl
     return f"min(max({expression},{limit[0]:.6f}),{limit[1]:.6f})"
 
 
+def canvas(source: tuple[int, int], fit: str) -> tuple[int, int, int, int]:
+    """The 16:9 canvas a window is brought into, and where the window sits on it.
+
+    `pad` keeps the whole window (offsets are >= 0), `crop` fills the frame by
+    trimming the sides or the top and bottom (offsets are <= 0). Sizes are even
+    so every later scale lands on whole chroma samples.
+    """
+    src_w, src_h = source
+    if fit == "pad":
+        width, height = max(src_w, src_h * OUT_W / OUT_H), max(src_h, src_w * OUT_H / OUT_W)
+    else:
+        width, height = min(src_w, src_h * OUT_W / OUT_H), min(src_h, src_w * OUT_H / OUT_W)
+    width, height = int(round(width / 2)) * 2, int(round(height / 2)) * 2
+    return width, height, (width - src_w) // 2, (height - src_h) // 2
+
+
+def ceiling_for(source: tuple[int, int], fit: str) -> float:
+    """The deepest zoom that still downscales the canvas, never below 1.
+
+    A canvas narrower than 1920 is already upscaled at zoom 1; that is
+    reported as `upscaled` rather than refused, so small windows still render.
+    """
+    return round(max(canvas(source, fit)[0] / OUT_W, 1.0), 3)
+
+
 def build_filter(
     keys: list[tuple[float, float, float, float]],
     source: tuple[int, int],
@@ -68,24 +95,28 @@ def build_filter(
     Below the ceiling that scale is a downscale, so nothing is upsampled.
     """
     src_w, src_h = source
+    can_w, can_h, off_x, off_y = canvas(source, fit)
     # `trim` + `setpts` restart the clock at zero, so keyframe times are
     # already relative to the wanted span; adding `start` would shift the move.
     times = [k[0] for k in keys]
+    # Keyframes name a point of the window; the pan works on the canvas, so
+    # move each point by the padding or the trim before easing towards it.
+    points_x = [(min(max(k[2], 0.0), 1.0) * src_w + off_x) / can_w for k in keys]
+    points_y = [(min(max(k[3], 0.0), 1.0) * src_h + off_y) / can_h for k in keys]
     zoom = piecewise("zoom", [(t, min(max(k[1], 1.0), ceiling)) for t, k in zip(times, keys)], (1.0, ceiling))
-    center_x = piecewise("cx", [(t, min(max(k[2], 0.0), 1.0)) for t, k in zip(times, keys)], (0.0, 1.0))
-    center_y = piecewise("cy", [(t, min(max(k[3], 0.0), 1.0)) for t, k in zip(times, keys)], (0.0, 1.0))
+    center_x = piecewise("cx", list(zip(times, points_x)), (0.0, 1.0))
+    center_y = piecewise("cy", list(zip(times, points_y)), (0.0, 1.0))
 
     steps = [
         f"trim=start={start}:duration={duration}" if duration else f"trim=start={start}",
         "setpts=PTS-STARTPTS",
     ]
-    # Bring the window into 16:9 first: pad keeps all of it, crop fills the
-    # frame by trimming the sides or the top. Either way the rest of the graph
-    # works on a 16:9 canvas and never stretches the picture.
+    # Bring the window into 16:9 first, so the rest of the graph works on a
+    # 16:9 canvas and never stretches the picture.
     steps.append(
-        "pad=w='max(iw,ih*16/9)':h='max(ih,iw*9/16)':x='(ow-iw)/2':y='(oh-ih)/2':color=0x0b0b0b"
+        f"pad=w={can_w}:h={can_h}:x={off_x}:y={off_y}:color=0x0b0b0b"
         if fit == "pad"
-        else "crop=w='min(iw,ih*16/9)':h='min(ih,iw*9/16)'"
+        else f"crop=w={can_w}:h={can_h}:x={-off_x}:y={-off_y}"
     )
     steps += [
         "setsar=1",
@@ -171,7 +202,7 @@ def main() -> int:
         return 5
     del probe_target
 
-    ceiling = round(min(source[0] / OUT_W, source[1] / OUT_H), 3)
+    ceiling = ceiling_for(source, args.fit)
     fps = args.fps or (frame_rate(args.input) if args.frames else 0.0)
     keys = sorted(args.keys)
     requested = [k[1] for k in keys]
@@ -209,6 +240,7 @@ def main() -> int:
         "ok": True,
         "source": list(source),
         "ceiling": ceiling,
+        "upscaled": canvas(source, args.fit)[0] < OUT_W,
         "zoom": clamped,
         "clamped": any(abs(a - b) > 1e-6 for a, b in zip(requested, clamped)),
         "out": args.out,

@@ -65,10 +65,12 @@ Vocabulary, with numbers that hold up:
 
 Rules:
 
-- **Ceiling.** `camera.py` reports `ceiling` = source width ÷ 1920 (1.333 for a
-  2x capture of a 1280-wide window). Asking for more clamps and says so; text
-  beyond it goes soft. Need a deeper push? record a bigger window, not a
-  bigger zoom.
+- **Ceiling.** `camera.py` brings the window onto a 16:9 canvas (`--fit pad`
+  letterboxes, `--fit crop` trims) and reports `ceiling` = canvas width ÷ 1920:
+  a 2x capture of a 1280×800 window gives 1.481 padded, 1.333 cropped. Asking
+  for more clamps and says so; text beyond it goes soft. A window under 960 pt
+  wide reports `upscaled` and only renders at zoom 1. Need a deeper push?
+  record a bigger window, not a bigger zoom.
 - **Ease everything.** smoothstep is the default and the right one; a linear
   move reads as a cut. Never start a move on the first frame of a cut and never
   end one on the last — leave 0.3–0.6 s of stillness at both ends.

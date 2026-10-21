@@ -91,13 +91,17 @@ eases between them, so a push-in or pan is a number instead of a timeline.
 ```console
 $ scripts/camera.py --input take.mp4 --out push-in.mp4 \
     --keys 0:1.0:0.5:0.5 0.4:1.0:0.5:0.5 2.6:1.28:0.16:0.34 --strip strip.jpg
-{"ok":true,"source":[2560,1600],"ceiling":1.333,"zoom":[1.0,1.0,1.28],"clamped":false,...}
+{"ok":true,"source":[2560,1600],"ceiling":1.481,"zoom":[1.0,1.0,1.28],"clamped":false,...}
 ```
 
-`t:zoom:x:y` — `zoom` is the magnification, `x`/`y` the normalised source point
-kept at the centre. Beyond `ceiling` (source width ÷ 1920) the image would be
-upscaled, so zooms are clamped there and reported. `--strip` writes a five
-frame contact strip of the result.
+`t:zoom:x:y` — `zoom` is the magnification, `x`/`y` the normalised point of the
+window kept at the centre. The window is first padded (`--fit pad`, default)
+or cropped (`--fit crop`) to 16:9; beyond `ceiling` (that canvas's width ÷
+1920) the image would be upscaled, so zooms are clamped there and reported.
+`--strip` writes a five frame contact strip of the result.
+
+`python3 -m unittest discover tests` renders synthetic takes of several window
+shapes and checks size, frame count and where the camera lands (needs ffmpeg).
 
 See [`skills/dolly/SKILL.md`](skills/dolly/SKILL.md) for the shot vocabulary
 and the recording workflow.
