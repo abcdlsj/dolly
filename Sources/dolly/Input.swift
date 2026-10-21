@@ -93,12 +93,12 @@ final class Poster {
         cursor = point
     }
 
-    func press(_ kind: CGMouseButton = .left, clicks: Int64 = 1) {
-        post(kind.isRight ? .rightMouseDown : .leftMouseDown, kind: kind, clicks: clicks)
+    func press(_ kind: CGMouseButton = .left, clicks: Int64 = 1, flags: CGEventFlags = []) {
+        post(kind.isRight ? .rightMouseDown : .leftMouseDown, kind: kind, clicks: clicks, flags: flags)
     }
 
-    func release(_ kind: CGMouseButton = .left, clicks: Int64 = 1) {
-        post(kind.isRight ? .rightMouseUp : .leftMouseUp, kind: kind, clicks: clicks)
+    func release(_ kind: CGMouseButton = .left, clicks: Int64 = 1, flags: CGEventFlags = []) {
+        post(kind.isRight ? .rightMouseUp : .leftMouseUp, kind: kind, clicks: clicks, flags: flags)
     }
 
     func drag(to point: Point) {
@@ -150,7 +150,7 @@ final class Poster {
         }
     }
 
-    private func post(_ type: CGEventType, kind: CGMouseButton, clicks: Int64) {
+    private func post(_ type: CGEventType, kind: CGMouseButton, clicks: Int64, flags: CGEventFlags) {
         guard let event = CGEvent(
             mouseEventSource: source,
             mouseType: type,
@@ -159,6 +159,9 @@ final class Poster {
         ) else { return }
         event.setIntegerValueField(.mouseEventClickState, value: clicks)
         event.setIntegerValueField(.mouseEventNumber, value: nextNumber())
+        // Modifiers ride on the press itself: a separate chord would type into
+        // whatever has focus instead of modifying the click.
+        if !flags.isEmpty { event.flags = flags }
         event.post(tap: .cghidEventTap)
     }
 }

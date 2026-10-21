@@ -150,12 +150,9 @@ enum Click {
         let count = max(args.int("count", 1), 1)
         let flags = Parsing.modifiers(args)
         for click in 1...count {
-            if !flags.isEmpty {
-                poster.key(code: 0, flags: flags)
-            }
-            poster.press(button, clicks: Int64(click))
+            poster.press(button, clicks: Int64(click), flags: flags)
             Timing.hold(0.03)
-            poster.release(button, clicks: Int64(click))
+            poster.release(button, clicks: Int64(click), flags: flags)
             Timing.hold(0.06)
         }
         Timing.hold(args.double("hold", 0))

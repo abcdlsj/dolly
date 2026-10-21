@@ -58,25 +58,42 @@ def build_filter(
     start: float,
     duration: float | None,
     ceiling: float,
+    fit: str = "pad",
 ) -> str:
+    """The filter graph for one move.
+
+    `crop` cannot animate its own width, so the move is built the other way
+    round: the whole frame is scaled by the current zoom (a scale CAN be
+    evaluated per frame), and a constant 1920x1080 window then pans over it.
+    Below the ceiling that scale is a downscale, so nothing is upsampled.
+    """
     src_w, src_h = source
-    times = [start + k[0] for k in keys]
+    # `trim` + `setpts` restart the clock at zero, so keyframe times are
+    # already relative to the wanted span; adding `start` would shift the move.
+    times = [k[0] for k in keys]
     zoom = piecewise("zoom", [(t, min(max(k[1], 1.0), ceiling)) for t, k in zip(times, keys)], (1.0, ceiling))
     center_x = piecewise("cx", [(t, min(max(k[2], 0.0), 1.0)) for t, k in zip(times, keys)], (0.0, 1.0))
     center_y = piecewise("cy", [(t, min(max(k[3], 0.0), 1.0)) for t, k in zip(times, keys)], (0.0, 1.0))
 
-    # The crop keeps the output's 16:9, so the window's extra height is
-    # trimmed instead of squashed.
-    width = f"({src_w:.0f}/({zoom}))"
-    height = f"({width}*{OUT_H}/{OUT_W})"
-    left = f"min(max(({center_x})*{src_w:.0f}-{width}/2,0),{src_w:.0f}-{width})"
-    top = f"min(max(({center_y})*{src_h:.0f}-{height}/2,0),{src_h:.0f}-{height})"
-
     steps = [
         f"trim=start={start}:duration={duration}" if duration else f"trim=start={start}",
         "setpts=PTS-STARTPTS",
-        f"crop=w='{width}':h='{height}':x='{left}':y='{top}'",
-        f"scale={OUT_W}:{OUT_H}:flags=lanczos",
+    ]
+    # Bring the window into 16:9 first: pad keeps all of it, crop fills the
+    # frame by trimming the sides or the top. Either way the rest of the graph
+    # works on a 16:9 canvas and never stretches the picture.
+    steps.append(
+        "pad=w='max(iw,ih*16/9)':h='max(ih,iw*9/16)':x='(ow-iw)/2':y='(oh-ih)/2':color=0x0b0b0b"
+        if fit == "pad"
+        else "crop=w='min(iw,ih*16/9)':h='min(ih,iw*9/16)'"
+    )
+    steps += [
+        "setsar=1",
+        f"scale=w='trunc({OUT_W}*({zoom})/2)*2':h='trunc({OUT_H}*({zoom})/2)*2':eval=frame"
+        ":flags=lanczos",
+        f"crop=w={OUT_W}:h={OUT_H}"
+        f":x='trunc(min(max(({center_x})*{OUT_W}*({zoom})-{OUT_W // 2},0),{OUT_W}*({zoom})-{OUT_W}))'"
+        f":y='trunc(min(max(({center_y})*{OUT_H}*({zoom})-{OUT_H // 2},0),{OUT_H}*({zoom})-{OUT_H}))'",
         "format=yuv420p",
     ]
     return ",".join(steps)
@@ -96,9 +113,29 @@ def probe(path: str) -> tuple[tuple[int, int], float]:
     return (int(stream["width"]), int(stream["height"])), float(data["format"].get("duration", 0))
 
 
-def input_args(path: str, pattern: bool) -> list[str]:
+def frame_rate(directory: str) -> float:
+    """The capture rate a frame directory actually has.
+
+    Frames are named by millisecond stamp, so the median gap is the real
+    interval: assuming a fixed rate would retime takes that were captured
+    faster or slower than it.
+    """
+    stamps = []
+    for name in os.listdir(directory):
+        stem = os.path.splitext(name)[0]
+        if name.endswith(".png") and stem.isdigit():
+            stamps.append(int(stem))
+    if len(stamps) < 2:
+        return 30.0
+    stamps.sort()
+    gaps = sorted(b - a for a, b in zip(stamps, stamps[1:]) if b > a)
+    median = gaps[len(gaps) // 2]
+    return 1000.0 / median if median else 30.0
+
+
+def input_args(path: str, pattern: bool, fps: float) -> list[str]:
     if pattern:
-        return ["-framerate", "30", "-pattern_type", "glob", "-i", os.path.join(path, "*.png")]
+        return ["-framerate", f"{fps:.3f}", "-pattern_type", "glob", "-i", os.path.join(path, "*.png")]
     return ["-i", path]
 
 
@@ -111,6 +148,10 @@ def main() -> int:
                         help="keyframes as t:zoom:x:y (x,y normalised, default centre)")
     parser.add_argument("--start", type=float, default=0.0, help="start time inside the input")
     parser.add_argument("--duration", type=float, default=None, help="length of the move")
+    parser.add_argument("--fit", choices=["pad", "crop"], default="pad",
+                        help="pad keeps the source aspect (letterboxed); crop fills the frame")
+    parser.add_argument("--fps", type=float, default=None,
+                        help="frame directory rate; read from the frame timestamps by default")
     parser.add_argument("--crf", type=int, default=16)
     parser.add_argument("--strip", help="also write a 5-frame contact strip here")
     parser.add_argument("--dry-run", action="store_true", help="print the filter instead of encoding")
@@ -131,14 +172,15 @@ def main() -> int:
     del probe_target
 
     ceiling = round(min(source[0] / OUT_W, source[1] / OUT_H), 3)
+    fps = args.fps or (frame_rate(args.input) if args.frames else 0.0)
     keys = sorted(args.keys)
     requested = [k[1] for k in keys]
     clamped = [round(min(max(z, 1.0), ceiling), 3) for z in requested]
-    graph = build_filter(keys, source, args.start, args.duration, ceiling)
+    graph = build_filter(keys, source, args.start, args.duration, ceiling, args.fit)
 
     command = [
         "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
-        *input_args(args.input, args.frames),
+        *input_args(args.input, args.frames, fps or 30.0),
         "-vf", graph,
         "-c:v", "libx264", "-profile:v", "high", "-pix_fmt", "yuv420p",
         "-crf", str(args.crf), "-preset", "slow", "-r", "30",
@@ -170,6 +212,8 @@ def main() -> int:
         "zoom": clamped,
         "clamped": any(abs(a - b) > 1e-6 for a, b in zip(requested, clamped)),
         "out": args.out,
+        "fit": args.fit,
+        "fps": round(fps, 2) if fps else None,
         "strip": strip,
     }))
     return 0
