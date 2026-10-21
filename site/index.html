@@ -2,235 +2,104 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>dolly — camera moves for macOS screen recordings</title>
-  <meta name="description" content="Real pointer, keyboard and accessibility input for macOS screen recordings, plus eased push-ins, pans and pull-backs in post. Built for agents.">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>dolly</title>
+  <meta name="description" content="Real input and eased camera moves for macOS screen recordings.">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..900&family=JetBrains+Mono:wght@400;500&display=swap">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header class="nav">
-    <a class="brand" href="#top"><img src="icon.svg" alt="" width="28" height="28"><span>dolly</span></a>
-    <nav>
-      <a href="#how">How it works</a>
-      <a href="#moves">Moves</a>
-      <a href="#formats">Formats</a>
-      <a href="#install">Install</a>
-      <a class="gh" href="https://github.com/abcdlsj/dolly">GitHub</a>
-    </nav>
+  <header class="bar">
+    <a class="mark" href="#top"><img src="icon.svg" alt="" width="26" height="26">dolly</a>
+    <a href="https://github.com/abcdlsj/dolly">GitHub ↗</a>
   </header>
 
   <main id="top">
-    <!-- Hero: the finished film, with the raw take and its camera inset -->
     <section class="hero">
-      <div class="hero-copy">
-        <p class="eyebrow">macOS · CLI · built for agents</p>
-        <h1>Film your app like a<br><em>camera operator</em>.</h1>
-        <p class="lede">dolly drives a real pointer through hovers and drags, records one window without stealing focus,
-          and turns the raw take into eased push-ins, pans and pull-backs — every move a number in a shot file.</p>
-        <div class="cta">
-          <a class="button primary" href="#install">Get started</a>
-          <a class="button" href="#moves">See the moves</a>
-        </div>
-      </div>
-      <figure class="hero-stage">
-        <div class="monitor">
-          <canvas id="hero" aria-label="A task board being filmed: the pointer drags a card to Done while the camera pushes in, follows and pulls back"></canvas>
-          <button class="playpause" data-for="hero" aria-label="Pause">❚❚</button>
-        </div>
-        <div class="timeline" id="hero-timeline" aria-hidden="true">
-          <div class="track"></div>
-          <div class="playhead"></div>
-        </div>
-        <figcaption>The film, rendered from a 2× take. Inset: the whole window and the camera's frame on it.</figcaption>
-      </figure>
-    </section>
-
-    <!-- How it works: drive, record, move -->
-    <section id="how" class="section">
-      <header class="section-head">
-        <p class="eyebrow">How it works</p>
-        <h2>One pass of real input. Camera work in post.</h2>
-        <p>Synthetic input is the only way to film hover states and real drag sessions. dolly posts real HID events on an eased
-          clock, copies frames out of one window, and leaves the camera to a script — so a push-in is a number, not a timeline.</p>
-      </header>
-
-      <div class="step">
-        <div class="step-copy">
-          <span class="step-no">01</span>
-          <h3>Drive</h3>
-          <p>Every verb prints one JSON object and takes <code>--guard</code>, so an agent can hover a row, drag a card or press a
-            menu item and never touch the wrong app. Holds keep hover plates and drop overlays on screen long enough to film.</p>
-        </div>
-        <div class="step-visual">
-          <div class="pane">
-            <canvas id="drive" class="ratio-window" aria-label="The pointer hovers a card, then drags it to Done"></canvas>
-          </div>
-          <pre class="terminal" id="drive-terminal" aria-live="off"></pre>
-        </div>
-      </div>
-
-      <div class="step">
-        <div class="step-copy">
-          <span class="step-no">02</span>
-          <h3>Record</h3>
-          <p><code>dolly record</code> copies frames out of one window with <code>screencapture -l</code> — no focus stolen, no other
-            windows in shot. Four capture loops reach about 60 fps, enough to slow a moment to a third of its speed later.</p>
-          <pre class="snippet">$ dolly record 61527 /tmp/take 6 --loops 4
-{"fps":61.2,"frames":367,"ok":true,"seconds":6.0}</pre>
-        </div>
-        <div class="step-visual">
-          <div class="pane"><canvas id="record" class="ratio-strip" aria-label="Frames of the window streaming into a take"></canvas></div>
-        </div>
-      </div>
-
-      <div class="step">
-        <div class="step-copy">
-          <span class="step-no">03</span>
-          <h3>Move</h3>
-          <p><code>scripts/camera.py</code> crops the high-resolution take along keyframes. The camera follows a monotone spline:
-            it starts and stops softly, glides through the keyframes in between, and zooms by ratio so a push-in looks even.</p>
-          <pre class="snippet" id="hero-explain">$ scripts/camera.py --shot shot.json --explain
-{"ok":true,"peak_pan":0.6,"warnings":[]}</pre>
-        </div>
-        <div class="step-visual">
-          <div class="pane"><canvas id="move" class="ratio-wide" aria-label="The camera's frame travelling over the whole take, with the film it produces"></canvas></div>
-        </div>
+      <h1>Camera moves<br>for screen recordings.</h1>
+      <p class="lede">Real pointer input on macOS. Push-ins, pans and pull-backs in post. Every move is a number.</p>
+      <div class="frame">
+        <canvas id="hero" class="r169" aria-label="A card dragged to Done while the camera pushes in, follows and pulls back"></canvas>
       </div>
     </section>
 
-    <!-- Named moves -->
-    <section id="moves" class="section">
-      <header class="section-head">
-        <p class="eyebrow">Named moves</p>
-        <h2>Write the shot, not the arithmetic.</h2>
-        <p>A shot file lists beats. Each one expands into keyframes; <code>--explain</code> prints them with peak speeds and
-          warnings before anything renders. Everything below runs the same planner in your browser.</p>
-      </header>
-
-      <div class="moves">
-        <div class="tabs" role="tablist" id="move-tabs"></div>
-        <div class="moves-stage">
-          <div class="pane labelled" data-label="Take + camera"><canvas id="moves-overview" class="ratio-wide"></canvas></div>
-          <div class="pane labelled" data-label="Film"><canvas id="moves-film" class="ratio-wide"></canvas></div>
-        </div>
-        <div class="pane chart-pane"><canvas id="moves-chart" class="ratio-chart" aria-label="Zoom and pan over time"></canvas></div>
-        <p class="move-blurb" id="move-blurb"></p>
-        <div class="moves-code">
-          <div>
-            <h4>shot.json</h4>
-            <pre class="code" id="move-json"></pre>
-          </div>
-          <div>
-            <h4>camera.py --explain</h4>
-            <pre class="code" id="move-explain"></pre>
-          </div>
-        </div>
+    <section class="row">
+      <div class="copy">
+        <h2>Drive</h2>
+        <p>Hover, click, drag. Real events, eased, guarded to one app.</p>
+      </div>
+      <div class="visual">
+        <div class="frame"><canvas id="drive" class="r169" aria-label="The pointer hovers a card, then drags it to Done"></canvas></div>
+        <pre class="term" id="drive-terminal"></pre>
       </div>
     </section>
 
-    <!-- Easing -->
-    <section id="ease" class="section">
-      <header class="section-head">
-        <p class="eyebrow">Ease everything</p>
-        <h2>A linear move reads as a cut.</h2>
-        <p>Pointer travel takes <code>--ease inOut|out|inQuint|linear</code>, and camera beats take <code>spline</code>,
-          <code>smooth</code>, <code>out</code>, <code>in</code>, <code>linear</code> or <code>back</code>. Keep linear for a slow
-          <code>drift</code>; let everything else start and stop softly.</p>
-      </header>
-      <div class="pane"><canvas id="eases" class="ratio-eases" aria-label="Four pointers travelling with linear, inOut, out and inQuint easing"></canvas></div>
+    <section class="row">
+      <div class="copy">
+        <h2>Record</h2>
+        <p>One window, 60 fps, focus untouched.</p>
+      </div>
+      <div class="visual">
+        <div class="frame"><canvas id="record" class="r167" aria-label="Frames of the window streaming into a take"></canvas></div>
+      </div>
     </section>
 
-    <!-- Formats -->
-    <section id="formats" class="section">
-      <header class="section-head">
-        <p class="eyebrow">Any format</p>
-        <h2>One take, every aspect.</h2>
-        <p>The window is padded or cropped onto a canvas of the output aspect. Past the <em>ceiling</em> — canvas width ÷ output
-          width — text would be upscaled, so deeper zooms are clamped and reported. Need more? Record a bigger window.</p>
-      </header>
-      <div class="formats">
-        <div class="controls">
-          <div class="segmented" id="aspect-buttons" role="group" aria-label="Aspect">
-            <button data-aspect="16:9" class="on">16:9</button>
-            <button data-aspect="9:16">9:16</button>
-            <button data-aspect="1:1">1:1</button>
-            <button data-aspect="4:5">4:5</button>
-          </div>
-          <div class="segmented" id="fit-buttons" role="group" aria-label="Fit">
-            <button data-fit="pad" class="on">--fit pad</button>
-            <button data-fit="crop">--fit crop</button>
-          </div>
-          <dl class="readout" id="format-readout"></dl>
+    <section class="row">
+      <div class="copy">
+        <h2>Move</h2>
+        <p>Crop the 2× take along a spline. Starts soft, lands soft.</p>
+      </div>
+      <div class="visual">
+        <div class="frame"><canvas id="move" class="r169" aria-label="The camera's frame travelling over the take, with the film it produces"></canvas></div>
+      </div>
+    </section>
+
+    <section class="moves" id="moves">
+      <h2>Named moves</h2>
+      <div class="tabs" id="move-tabs" role="tablist"></div>
+      <div class="pair">
+        <div class="frame"><canvas id="moves-overview" class="r169" aria-label="The take with the camera's frame"></canvas></div>
+        <div class="frame"><canvas id="moves-film" class="r169" aria-label="The film"></canvas></div>
+      </div>
+      <canvas id="moves-chart" class="chart" aria-label="Zoom over time"></canvas>
+      <pre class="code" id="move-json"></pre>
+    </section>
+
+    <section class="row formats">
+      <div class="copy">
+        <h2>Any aspect</h2>
+        <p>One take, cut for every feed.</p>
+        <div class="seg" id="aspect-buttons" role="group" aria-label="Aspect">
+          <button data-aspect="16:9" class="on">16:9</button>
+          <button data-aspect="9:16">9:16</button>
+          <button data-aspect="1:1">1:1</button>
+          <button data-aspect="4:5">4:5</button>
         </div>
-        <div class="pane format-pane"><canvas id="format" class="ratio-format" aria-label="The film in the chosen aspect"></canvas></div>
+        <div class="seg" id="fit-buttons" role="group" aria-label="Fit">
+          <button data-fit="pad" class="on">pad</button>
+          <button data-fit="crop">crop</button>
+        </div>
+        <p class="note" id="format-note"></p>
+      </div>
+      <div class="visual">
+        <canvas id="format" class="r1610" aria-label="The film in the chosen aspect"></canvas>
       </div>
     </section>
 
-    <!-- Agents -->
-    <section class="section">
-      <header class="section-head">
-        <p class="eyebrow">For agents</p>
-        <h2>Predictable enough to script.</h2>
-      </header>
-      <div class="tiles">
-        <article>
-          <h3><code>--guard</code></h3>
-          <p>Refuse unless the named pid, bundle or app is frontmost. A stray move can't click the user's own window — the call
-            exits 3 and posts nothing.</p>
-        </article>
-        <article>
-          <h3>One JSON object</h3>
-          <p>Every call, even <code>help</code>, prints one object with <code>ok</code>. Pipe it to <code>jq</code>, branch on it,
-            log it.</p>
-        </article>
-        <article>
-          <h3>Stable exit codes</h3>
-          <p><code>0</code> ok · <code>2</code> usage · <code>3</code> refused by guard · <code>4</code> Accessibility not granted ·
-            <code>5</code> failed.</p>
-        </article>
-        <article>
-          <h3>A service, not a shell</h3>
-          <p>Accessibility belongs to a process. <code>dolly service start</code> registers one trusted process with launchd and
-            every later call is forwarded to it.</p>
-        </article>
-      </div>
-    </section>
-
-    <!-- Install -->
-    <section id="install" class="section">
-      <header class="section-head">
-        <p class="eyebrow">Install</p>
-        <h2>Three commands to the first take.</h2>
-      </header>
-      <ol class="install">
-        <li>
-          <div><h3>Build and sign</h3><p>Builds <code>Dolly.app</code> in <code>~/Applications</code>; an Apple Development identity keeps the grant across rebuilds.</p></div>
-          <pre class="code copyable">./scripts/install.sh</pre>
-        </li>
-        <li>
-          <div><h3>Grant Accessibility, once</h3><p>macOS asks for the Dolly app itself, not your terminal.</p></div>
-          <pre class="code copyable">~/Applications/Dolly.app/Contents/MacOS/dolly trust --prompt</pre>
-        </li>
-        <li>
-          <div><h3>Start the service</h3><p>Then call <code>dolly</code> from any shell or agent.</p></div>
-          <pre class="code copyable">~/Applications/Dolly.app/Contents/MacOS/dolly service start</pre>
-        </li>
-        <li>
-          <div><h3>Film something</h3><p>Hover, record, then cut a move over the take.</p></div>
-          <pre class="code copyable">dolly front
-dolly hover 640,420 --guard 4711 --hold 1.4
-dolly record 61527 /tmp/take 6 --loops 4
-scripts/camera.py --shot shot.json --strip strip.jpg</pre>
-        </li>
-      </ol>
-      <p class="more">The full shot vocabulary and the recording workflow live in
-        <a href="https://github.com/abcdlsj/dolly/blob/main/skills/dolly/SKILL.md"><code>skills/dolly/SKILL.md</code></a>.</p>
+    <section class="install" id="install">
+      <h2>Start</h2>
+      <pre class="code copyable">./scripts/install.sh
+alias dolly=~/Applications/Dolly.app/Contents/MacOS/dolly
+dolly trust --prompt
+dolly service start</pre>
+      <p>Then hand <a href="https://github.com/abcdlsj/dolly/blob/main/skills/dolly/SKILL.md">SKILL.md</a> to your agent.</p>
     </section>
   </main>
 
-  <footer class="footer">
-    <img src="icon.svg" alt="" width="22" height="22">
+  <footer class="foot">
     <span>dolly · MIT</span>
     <a href="https://github.com/abcdlsj/dolly">github.com/abcdlsj/dolly</a>
   </footer>
