@@ -333,12 +333,21 @@ enum Windows {
 enum Trust {
     static let name = "trust"
     static let summary = "report Accessibility trust, optionally ask for it"
-    static let usage = "dolly trust [--prompt]"
+    static let usage = "dolly trust [--prompt [--wait 60]]"
     static let spec = Command(name: name, summary: summary, usage: usage, run: run)
 
     static func run(_ args: Args) throws -> [String: Any] {
-        if args.flag("prompt") { Accessibility.requestTrust() }
-        return ["trusted": Accessibility.trusted()]
+        guard args.flag("prompt") else { return ["trusted": Accessibility.trusted()] }
+        // The system prompt is attributed to this process, so stay alive while
+        // it is on screen; exiting closes it before the grant is recorded.
+        Accessibility.requestTrust()
+        let deadline = Date().addingTimeInterval(args.double("wait", 60))
+        var waited = 0.0
+        while Date() < deadline, !Accessibility.trusted() {
+            Thread.sleep(forTimeInterval: 0.5)
+            waited += 0.5
+        }
+        return ["trusted": Accessibility.trusted(), "waited": waited]
     }
 }
 
@@ -381,8 +390,13 @@ enum Help {
     static let usage = "dolly help"
     static let spec = Command(name: name, summary: summary, usage: usage, run: run)
 
+    /// Help is one JSON object too: agents read `commands`, people read
+    /// `text` (see `scripts/dolly help | jq -r .text`).
+    static var payload: [String: Any] {
+        ["text": Usage.text(), "commands": Registry.all.map(\.name)]
+    }
+
     static func run(_ args: Args) throws -> [String: Any] {
-        print(Usage.text())
-        return ["commands": Registry.all.map(\.name)]
+        payload
     }
 }

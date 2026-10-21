@@ -162,8 +162,9 @@ extension CGMouseButton {
 /// every few milliseconds so hover state, cursors and drag sessions all see
 /// the journey instead of a jump.
 enum Travel {
-    /// How often an event is posted. 4 ms keeps `onHover` and `onContinuousHover`
-    /// fed without flooding the window server.
+    /// Minimum spacing between events. Posting to the HID tap costs a few
+    /// milliseconds on its own, so the loop is paced by wall clock: the move
+    /// takes the time it was asked for even when events are slow.
     static let stepMilliseconds = 4.0
 
     static func run(
@@ -178,22 +179,21 @@ enum Travel {
         for index in 1..<stops.count {
             cumulative.append(cumulative[index - 1] + stops[index - 1].distance(to: stops[index]))
         }
-        let total = cumulative.last ?? 0
-        guard total > 0, path.count > 0 else { return }
+        guard let total = cumulative.last, total > 0, !path.isEmpty else { return }
 
-        let duration = Double(max(milliseconds, 1)) / 1000
-        let steps = max(Int((duration * 1000 / stepMilliseconds).rounded()), 2)
-        let interval = duration / Double(steps)
-
-        for step in 0...steps {
-            let distance = ease.value(Double(step) / Double(steps)) * total
-            let point = position(at: distance, stops: stops, cumulative: cumulative)
-            if dragging {
-                poster.drag(to: point)
-            } else {
-                poster.move(to: point)
-            }
-            if step < steps { Thread.sleep(forTimeInterval: interval) }
+        let duration = Double(max(milliseconds, 0)) / 1000
+        let started = Date()
+        while true {
+            let elapsed = Date().timeIntervalSince(started)
+            let progress = duration > 0 ? min(elapsed / duration, 1) : 1
+            let point = position(
+                at: ease.value(progress) * total,
+                stops: stops,
+                cumulative: cumulative
+            )
+            if dragging { poster.drag(to: point) } else { poster.move(to: point) }
+            if progress >= 1 { break }
+            Thread.sleep(forTimeInterval: stepMilliseconds / 1000)
         }
         if let last = path.last {
             if dragging { poster.drag(to: last) } else { poster.move(to: last) }

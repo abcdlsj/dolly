@@ -12,6 +12,9 @@ moves.
 
 ## Before the first input
 
+0. `dolly service start` once per machine — Accessibility is per process, and a
+   dolly launched by an untrusted shell cannot post events. `dolly service
+   status` confirms it answers.
 1. `dolly front` — read the pid, name and bundle of what the user is looking at.
 2. Pass `--guard <pid>` on **every** input verb. Without it a stray move can
    click the user's own window; with it the call refuses (exit 3) instead.

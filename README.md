@@ -5,7 +5,8 @@ eased camera moves in post. Built for agents: one JSON object per call, stable
 exit codes, and a `--guard` that refuses to touch the wrong app.
 
 ```console
-$ dolly help
+$ dolly help | jq -r .text        # help is a JSON object too
+$ dolly service start             # macOS grants Accessibility per process
 $ dolly front
 {"bundle":"com.example.App","command":"front","name":"App","ok":true,"pid":4711}
 
@@ -28,15 +29,23 @@ without stealing focus, so the same run can be cut into a film afterwards.
 
 ```console
 $ ./scripts/install.sh              # builds Dolly.app in ~/Applications and signs it
-$ ~/Applications/Dolly.app/Contents/MacOS/dolly trust --prompt
+$ ~/Applications/Dolly.app/Contents/MacOS/dolly trust --prompt   # grant it, once
+$ ~/Applications/Dolly.app/Contents/MacOS/dolly service start
 ```
 
-Grant it in System Settings → Privacy & Security → Accessibility, then check:
+The installer signs with an Apple Development identity when one exists, so the
+grant survives rebuilds. Ad-hoc signing works too, but macOS then asks again
+after every rebuild — use `DOLLY_SIGN_IDENTITY` to pin an identity.
 
-```console
-$ ~/Applications/Dolly.app/Contents/MacOS/dolly trust
-{"command":"trust","ok":true,"trusted":true}
-```
+## Why a service
+
+Accessibility belongs to a process. A dolly started by a shell inherits the
+shell's identity, and if the shell is not trusted its events are dropped
+silently — `dolly trust` reports `false` and every verb refuses with exit 4.
+`dolly service start` registers this binary with launchd, which makes dolly its
+own responsible process; every later call, from any shell, is forwarded over a
+UNIX socket to that one process. `dolly service status` shows it, `dolly
+service stop` ends it, and `DOLLY_LOCAL=1` forces a direct run.
 
 The installer signs with an Apple Development identity when one exists, so the
 grant survives rebuilds. Ad-hoc signing works too, but macOS then asks again
@@ -59,6 +68,7 @@ after every rebuild — use `DOLLY_SIGN_IDENTITY` to pin an identity.
 | `front` | frontmost app (pid, name, bundle) |
 | `windows` | window ids and frames |
 | `trust` | Accessibility state, `--prompt` to ask |
+| `service start\|stop\|status` | the launchd-hosted input service |
 | `record <windowID> <dir> <seconds>` | window-only frames for a camera move |
 
 Shared flags: `--guard <pid|bundle|name>` (refuse unless that app is frontmost),

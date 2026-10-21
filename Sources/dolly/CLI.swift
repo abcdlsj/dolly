@@ -25,30 +25,6 @@ struct Failure: Error {
     }
 }
 
-enum Output {
-    /// One JSON object per invocation: `ok` plus the command's own fields.
-    static func success(_ command: String, _ fields: [String: Any] = [:]) -> Never {
-        var object: [String: Any] = ["ok": true, "command": command]
-        object.merge(fields) { _, new in new }
-        write(object)
-        exit(Exit.ok.rawValue)
-    }
-
-    static func failure(_ error: Failure) -> Never {
-        write(["ok": false, "error": error.message])
-        exit(error.code.rawValue)
-    }
-
-    static func write(_ object: [String: Any]) {
-        let data = (try? JSONSerialization.data(
-            withJSONObject: object,
-            options: [.sortedKeys, .withoutEscapingSlashes]
-        )) ?? Data("{\"ok\":false,\"error\":\"encode failed\"}".utf8)
-        FileHandle.standardOutput.write(data)
-        FileHandle.standardOutput.write(Data("\n".utf8))
-    }
-}
-
 // MARK: - Arguments
 
 /// Parsed arguments: positional values in order, `--flag value` and
@@ -172,6 +148,10 @@ enum Shared {
     }
 
     static func requireTrust() throws {
+        // DOLLY_ASSUME_TRUST exists for diagnosing whether events land when
+        // this shell is not the trusted process; it never changes the check
+        // the tool reports.
+        if ProcessInfo.processInfo.environment["DOLLY_ASSUME_TRUST"] == "1" { return }
         guard Accessibility.trusted() else {
             throw Failure("Accessibility is not granted to this binary", code: .untrusted)
         }
@@ -200,12 +180,18 @@ enum Usage {
             lines.append("  \(String(repeating: " ", count: 9))   \(command.usage)")
         }
         lines.append("")
+        lines.append("Service (macOS grants Accessibility per process; a launchd-started")
+        lines.append("dolly is its own process, so calls from any shell keep working):")
+        lines.append("  dolly service start|stop|status")
+        lines.append("  dolly serve --socket <path>    run the service in the foreground")
+        lines.append("")
         lines.append("Shared flags:")
         lines.append("  --guard <pid|bundle|name>  refuse to run unless that app is frontmost")
         lines.append("  --ms <n>                   travel time in milliseconds (default 700)")
         lines.append("  --ease inOut|out|inQuint|linear")
         lines.append("")
-        lines.append("Every command prints one JSON object: {\"ok\":true,\"command\":...}.")
+        lines.append("Every command prints one JSON object with ok, command, code and its own")
+        lines.append("fields; this text is the help command's `text` field.")
         lines.append("Exit codes: 0 ok, 2 usage, 3 refused, 4 untrusted, 5 failed.")
         return lines.joined(separator: "\n")
     }
