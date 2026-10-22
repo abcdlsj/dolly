@@ -72,6 +72,12 @@ after every rebuild — use `DOLLY_SIGN_IDENTITY` to pin an identity.
 | `trust` | Accessibility state, `--prompt` to ask |
 | `service start\|stop\|status` | the launchd-hosted input service |
 | `record <windowID> <dir> <seconds>` | window-only frames for a camera move |
+| `capture <windowID> <out.mov> <seconds>` | one window as video, at the display's frame rate |
+| `launch <app> [--isolated [dir]]` | start an app — with `--isolated`, a second copy with its own home — and wait for its window |
+| `quit <pid>` | quit it again (`--force` if it hangs) |
+| `snap <windowID\|--pid n> <out.png>` | one frame of a window to look at, with the `scale` back to screen points |
+| `tree <pid>` | the window's controls: role, texts, actions, screen frame and shot-file `rect` |
+| `events start <file>\|stop\|status` | log input and capture times during a take; `stop` returns them as beats |
 
 Shared flags: `--guard <pid|bundle|name>` (refuse unless that app is frontmost),
 `--ms`, `--ease inOut|out|inQuint|linear`.
@@ -82,6 +88,41 @@ inside a window and stay valid when the window moves.
 
 Exit codes: `0` ok, `2` usage, `3` refused by guard, `4` Accessibility not
 granted, `5` failed. Every call prints one JSON object with `ok`.
+
+## Exploring an app
+
+An agent that films an app it has never seen needs to try it first, without
+touching the user's own data, and to look at what it did:
+
+```console
+$ dolly launch /Applications/Notely.app --isolated --size 1440,900 --at 80,60
+{"ok":true,"pid":5120,"profile":"…/dolly/profiles/app.notely-1792636000","ready":true,"window":{"id":88231,…}}
+$ dolly snap --pid 5120 look.png          # PNG ≤1600 px, plus frame and scale
+$ dolly tree 5120 | jq '.nodes[] | select(.role=="AXButton") | {title, center, rect}'
+$ dolly quit 5120
+```
+
+`--isolated` starts a new instance with `HOME`, `TMPDIR` and the XDG
+directories moved into a profile folder, so Application Support, caches and
+dotfiles start empty. A sandboxed app keeps its container and `launch` says so
+in `warning`. `tree`'s `rect` is the control's frame as a fraction of the
+window — exactly what a shot file's `focus` takes — and `center` is the screen
+point to click.
+
+During a take, `events` notes when each input happened relative to the
+recording, so a push-in can start on the frame the hover appears:
+
+```console
+$ dolly events start take/events.jsonl
+$ dolly capture 88231 take/take.mov 8 &     # the service records and drives at once
+$ dolly hover 620,410 --guard 5120 --hold 1.2
+$ dolly events stop
+{"ok":true,"beats":[{"verb":"hover","at":1.42,"until":2.31,"point":[0.3756,0.3881],…}],…}
+```
+
+The service runs calls side by side, so a `capture` in the background no longer
+blocks the input verbs; those still run one at a time. Paths are resolved
+against the caller's directory, not the service's.
 
 ## Camera moves
 

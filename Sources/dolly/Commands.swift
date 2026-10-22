@@ -437,11 +437,12 @@ enum Record {
 
     static func run(_ args: Args) throws -> [String: Any] {
         guard let windowID = args.positional[safe: 0].flatMap(Int.init),
-              let directory = args.positional[safe: 1].map({ URL(fileURLWithPath: $0) }),
+              let directory = args.positional[safe: 1].map(args.file),
               let seconds = args.positional[safe: 2].flatMap(Double.init) else {
             throw Failure("expected a window id, a directory and a duration")
         }
         let loops = args.int("loops", 4)
+        let started = Date()
         let result = try Capture.frames(
             windowID: windowID,
             directory: directory,
@@ -453,12 +454,13 @@ enum Record {
             "directory": directory.path,
             "frames": result.count,
             "seconds": (result.duration * 1000).rounded() / 1000,
+            "started": Int(started.timeIntervalSince1970 * 1000),
             "fps": result.duration > 0 ? ((Double(result.count) / result.duration) * 10).rounded() / 10 : 0,
         ]
     }
 }
 
-// MARK: - help
+// MARK: - capture
 
 enum CaptureFilm {
     static let name = "capture"
@@ -468,13 +470,15 @@ enum CaptureFilm {
 
     static func run(_ args: Args) throws -> [String: Any] {
         guard let windowID = args.positional[safe: 0].flatMap(Int.init),
-              let file = args.positional[safe: 1].map({ URL(fileURLWithPath: $0) }),
+              let file = args.positional[safe: 1].map(args.file),
               let seconds = args.positional[safe: 2].flatMap(Double.init) else {
             throw Failure("expected a window id, an output file and a duration")
         }
         return try Capture.video(windowID: windowID, file: file, seconds: seconds)
     }
 }
+
+// MARK: - help
 
 enum Help {
     static let name = "help"

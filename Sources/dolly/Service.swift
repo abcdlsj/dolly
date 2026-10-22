@@ -21,7 +21,8 @@ enum Service {
 
     // MARK: - Server
 
-    /// Serves one request at a time, which is what a single pointer is anyway.
+    /// Serves requests side by side, so a `capture` can run while the same
+    /// agent drives the take; `Runner` keeps the input verbs in single file.
     static func serve(path: String) throws -> Never {
         try FileManager.default.createDirectory(
             at: URL(fileURLWithPath: path).deletingLastPathComponent(),
@@ -48,11 +49,14 @@ enum Service {
             throw Failure("cannot listen on \(path)", code: .failed)
         }
 
+        let queue = DispatchQueue(label: "dolly.service", attributes: .concurrent)
         while true {
             let client = accept(listener, nil, nil)
             guard client >= 0 else { continue }
-            handle(client)
-            close(client)
+            queue.async {
+                handle(client)
+                close(client)
+            }
         }
     }
 
@@ -63,7 +67,7 @@ enum Service {
             writeLine(client, Data("{\"code\":2,\"error\":\"bad request\",\"ok\":false}\n".utf8))
             return
         }
-        let result = Runner.run(argv: argv)
+        let result = Runner.run(argv: argv, cwd: request["cwd"] as? String)
         writeLine(client, Output.encode(command: result.fields["command"] as? String, result: result))
     }
 
@@ -114,7 +118,10 @@ enum Service {
             throw Failure("no service at \(path); run dolly service start", code: .failed)
         }
 
-        let request = try JSONSerialization.data(withJSONObject: ["argv": argv]) + Data("\n".utf8)
+        let request = try JSONSerialization.data(withJSONObject: [
+            "argv": argv,
+            "cwd": FileManager.default.currentDirectoryPath,
+        ]) + Data("\n".utf8)
         writeLine(fd, request)
         guard let response = readLine(fd) else {
             throw Failure("service closed the connection", code: .failed)

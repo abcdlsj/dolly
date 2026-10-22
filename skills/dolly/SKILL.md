@@ -27,6 +27,23 @@ moves.
 Never film the user's live app: start an isolated copy of the app (own config,
 own port, own data directory) and film that one.
 
+## Exploring an app you have not seen
+
+```console
+$ dolly launch <App.app|bundle id> --isolated --size 1440,900   # own profile, waits for the window
+$ dolly snap --pid <pid> look.png                               # read look.png to see the window
+$ dolly tree <pid>                                              # every control: role, title, center, rect
+$ dolly quit <pid>
+```
+
+- Work from `tree`, not from guessing pixels: `center` is the screen point to
+  hover or click, `rect` goes straight into a `focus` beat.
+- After every action that should change the window, `snap` again and look.
+- `snap` reports `scale`; a pixel `(px, py)` in the image is screen point
+  `(frame.x + px / scale, frame.y + py / scale)`.
+- `launch` warns when an app is sandboxed: then `--isolated` cannot move its
+  data, so do not create or delete anything the user would miss.
+
 ## Recording a take
 
 ```console
@@ -44,6 +61,18 @@ down a moment to a third of its speed afterwards. Plan the take as one pass:
 | drag something | `dolly drag … --ms 1100 --hold 0.7` — the hold keeps the drop overlay on screen |
 | switch tabs / press a control | `dolly press <pid> "<label>"` (AX) or `dolly click` |
 | leave the shot | hold still 0.4 s |
+
+To aim camera moves at what happened, log the take:
+
+```console
+$ dolly events start /tmp/take/events.jsonl
+$ dolly capture <windowID> /tmp/take/take.mov 8 &    # records while you drive it
+$ dolly hover … ; dolly drag … ; …
+$ dolly events stop      # beats: verb, at/until in seconds of the take, point in window fractions
+```
+
+Use each beat's `at` and `point` for the shot file's beats: start a `focus` on
+the `at` of the hover it explains.
 
 Pace: one beat per 1.5–3 s of finished film. Two beats inside a second reads as
 a glitch, and five seconds of one static frame reads as a crash.

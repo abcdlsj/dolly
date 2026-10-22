@@ -8,9 +8,18 @@ enum Runner {
         let code: Exit
     }
 
+    /// Verbs that move the one pointer or type into the one focus. The service
+    /// runs requests side by side, so a take can record while it is driven;
+    /// these still go one at a time.
+    static let inputVerbs: Set<String> = [
+        "move", "path", "hover", "click", "drag", "scroll", "key", "type", "press",
+        "place", "resize", "focus",
+    ]
+    private static let inputLock = NSLock()
+
     /// The command table is a value; nothing here touches the pointer unless a
     /// verb asks for it.
-    static func run(argv: [String]) -> Result {
+    static func run(argv: [String], cwd: String? = nil) -> Result {
         guard let verb = argv.first, !verb.hasPrefix("--") else {
             return Result(fields: Help.payload, code: .ok)
         }
@@ -18,8 +27,15 @@ enum Runner {
             return Result(fields: ["error": "unknown command \"\(verb)\"; run dolly help"], code: .usage)
         }
         do {
-            let args = try Args.parse(Array(argv.dropFirst()))
-            return Result(fields: try command.run(args), code: .ok)
+            var args = try Args.parse(Array(argv.dropFirst()))
+            args.cwd = cwd ?? FileManager.default.currentDirectoryPath
+            let serial = inputVerbs.contains(verb)
+            if serial { inputLock.lock() }
+            defer { if serial { inputLock.unlock() } }
+            let started = Date()
+            let fields = try command.run(args)
+            EventLog.note(verb: verb, started: started, ended: Date(), fields: fields)
+            return Result(fields: fields, code: .ok)
         } catch let failure as Failure {
             return Result(fields: ["error": failure.message], code: failure.code)
         } catch {

@@ -33,6 +33,9 @@ struct Failure: Error {
 struct Args {
     var positional: [String] = []
     var flags: [String: [String]] = [:]
+    /// The caller's working directory. A forwarded call runs inside the
+    /// service, whose own directory is `/`, so relative paths resolve here.
+    var cwd: String?
 
     static func parse(_ raw: [String]) throws -> Args {
         var args = Args()
@@ -84,6 +87,15 @@ struct Args {
         return value != "false" && value != "0" && value != "no"
     }
 
+    /// A file argument as the caller meant it: `~` expanded, relative paths
+    /// taken from the caller's directory rather than the service's.
+    func file(_ text: String) -> URL {
+        let expanded = (text as NSString).expandingTildeInPath
+        if expanded.hasPrefix("/") { return URL(fileURLWithPath: expanded).standardizedFileURL }
+        let base = URL(fileURLWithPath: cwd ?? FileManager.default.currentDirectoryPath, isDirectory: true)
+        return URL(fileURLWithPath: expanded, relativeTo: base).standardizedFileURL
+    }
+
     func require(_ count: Int, _ usage: String) throws {
         guard positional.count >= count else {
             throw Failure("expected \(usage)")
@@ -123,6 +135,11 @@ enum Registry {
         Trust.spec,
         Record.spec,
         CaptureFilm.spec,
+        Snap.spec,
+        Tree.spec,
+        Launch.spec,
+        Quit.spec,
+        Events.spec,
         Help.spec,
     ]
 

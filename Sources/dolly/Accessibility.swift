@@ -108,6 +108,108 @@ enum Accessibility {
         }
     }
 
+    /// The controls an agent can see and aim at, as a flat list: role, the
+    /// texts AX exposes, the frame in screen points and the same frame as a
+    /// fraction of `window`, which is the `rect` a shot file takes. Plain
+    /// containers are walked through but left out, so a window reads as its
+    /// buttons, fields and labels rather than its layout groups.
+    static func tree(pid: pid_t, window: CGRect, depth maxDepth: Int, limit: Int, menus: Bool) -> (nodes: [[String: Any]], truncated: Bool) {
+        var nodes: [[String: Any]] = []
+        var truncated = false
+
+        func visit(_ element: AXUIElement, depth: Int, parent: Int?) {
+            guard depth <= maxDepth else { return }
+            guard nodes.count < limit else { truncated = true; return }
+            let role = string(element, kAXRoleAttribute) ?? ""
+            if !menus, role == kAXMenuBarRole as String { return }
+
+            var index = parent
+            let frame = self.frame(element)
+            let candidates: [(String, String?)] = [
+                ("title", string(element, kAXTitleAttribute)),
+                ("description", string(element, kAXDescriptionAttribute)),
+                ("value", string(element, kAXValueAttribute)),
+                ("help", string(element, kAXHelpAttribute)),
+            ]
+            let texts = candidates.compactMap { key, value in value.map { (key, String($0.prefix(120))) } }
+            let actions = self.actions(element)
+            let visible = frame.map { $0.width > 0 && $0.height > 0 && $0.intersects(window) } ?? false
+            let interesting = !texts.isEmpty || !actions.isEmpty || Self.controlRoles.contains(role)
+
+            if visible, interesting, role != kAXApplicationRole as String, let frame {
+                var node: [String: Any] = [
+                    "i": nodes.count,
+                    "role": role,
+                    "frame": [frame.minX, frame.minY, frame.width, frame.height].map(round1),
+                    "center": [frame.midX, frame.midY].map(round1),
+                    "rect": [
+                        (frame.minX - window.minX) / window.width,
+                        (frame.minY - window.minY) / window.height,
+                        frame.width / window.width,
+                        frame.height / window.height,
+                    ].map(round4),
+                ]
+                if let parent { node["parent"] = parent }
+                if let subrole = string(element, kAXSubroleAttribute) { node["subrole"] = subrole }
+                for (key, value) in texts { node[key] = value }
+                if !actions.isEmpty { node["actions"] = actions }
+                if bool(element, kAXEnabledAttribute) == false { node["enabled"] = false }
+                if bool(element, kAXFocusedAttribute) == true { node["focused"] = true }
+                index = nodes.count
+                nodes.append(node)
+            }
+            for child in children(element) {
+                visit(child, depth: depth + 1, parent: index)
+                if nodes.count >= limit { truncated = true; return }
+            }
+        }
+
+        visit(AXUIElementCreateApplication(pid), depth: 0, parent: nil)
+        return (nodes, truncated)
+    }
+
+    private static let controlRoles: Set<String> = [
+        "AXButton", "AXCheckBox", "AXRadioButton", "AXPopUpButton", "AXMenuButton",
+        "AXTextField", "AXTextArea", "AXSearchField", "AXComboBox", "AXSlider",
+        "AXLink", "AXTab", "AXRow", "AXCell", "AXImage", "AXStaticText",
+        "AXDisclosureTriangle", "AXIncrementor", "AXColorWell", "AXSegmentedControl",
+    ]
+
+    private static func frame(_ element: AXUIElement) -> CGRect? {
+        var position = CGPoint.zero
+        var size = CGSize.zero
+        guard let origin = axValue(element, kAXPositionAttribute),
+              AXValueGetValue(origin, .cgPoint, &position),
+              let extent = axValue(element, kAXSizeAttribute),
+              AXValueGetValue(extent, .cgSize, &size) else { return nil }
+        return CGRect(origin: position, size: size)
+    }
+
+    private static func axValue(_ element: AXUIElement, _ attribute: String) -> AXValue? {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success,
+              let value, CFGetTypeID(value) == AXValueGetTypeID() else { return nil }
+        return (value as! AXValue)
+    }
+
+    private static func bool(_ element: AXUIElement, _ attribute: String) -> Bool? {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success else { return nil }
+        return value as? Bool
+    }
+
+    /// Actions worth naming: scrolling into view and the context menu are on
+    /// nearly everything and say nothing about what a control does.
+    private static func actions(_ element: AXUIElement) -> [String] {
+        var names: CFArray?
+        guard AXUIElementCopyActionNames(element, &names) == .success,
+              let list = names as? [String] else { return [] }
+        return list.filter { $0 != "AXScrollToVisible" && $0 != (kAXShowMenuAction as String) }
+    }
+
+    private static func round1(_ value: CGFloat) -> Double { (Double(value) * 10).rounded() / 10 }
+    private static func round4(_ value: CGFloat) -> Double { (Double(value) * 10000).rounded() / 10000 }
+
     static func describe(_ element: AXUIElement) -> String {
         [kAXRoleAttribute, kAXTitleAttribute, kAXDescriptionAttribute]
             .compactMap { string(element, $0) }

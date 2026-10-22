@@ -17,6 +17,7 @@ enum Capture {
         process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
         process.arguments = ["-v", "-V", String(seconds), "-R", region, "-x", file.path]
         process.standardError = FileHandle.nullDevice
+        let started = Date()
         try process.run()
         process.waitUntilExit()
         guard process.terminationStatus == 0, FileManager.default.fileExists(atPath: file.path) else {
@@ -25,9 +26,26 @@ enum Capture {
         return [
             "window": windowID,
             "file": file.path,
+            "started": Int(started.timeIntervalSince1970 * 1000),
             "region": region,
             "source": ["width": Int(frame.width * 2), "height": Int(frame.height * 2)],
         ]
+    }
+
+    /// One frame of one window, shadow left out so the image is exactly the
+    /// window's frame at the display's scale.
+    static func still(windowID: Int, file: URL) throws {
+        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+        process.arguments = ["-l", String(windowID), "-o", "-x", "-t", "png", file.path]
+        process.standardError = FileHandle.nullDevice
+        process.standardOutput = FileHandle.nullDevice
+        try process.run()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0, FileManager.default.fileExists(atPath: file.path) else {
+            throw Failure("screencapture failed for window \(windowID); is Screen Recording granted?", code: .failed)
+        }
     }
 
     static func frames(
