@@ -15,7 +15,8 @@ import { encode, parse, type PiCommand, type PiEvent } from "./rpc.ts";
 export interface PiProcess {
   send(line: string): void;
   onLine(listener: (line: string) => void): void;
-  onExit(listener: (code: number | null) => void): void;
+  /** `stderr` is what pi printed as it died: the only account of a startup failure. */
+  onExit(listener: (code: number | null, stderr: string) => void): void;
   kill(): void;
 }
 
@@ -109,20 +110,28 @@ export class PiDirector implements Director {
   }
 
   private async open(film: Film, prompt: string): Promise<void> {
-    const process = await this.spawn(film, this.store.settings);
+    let process: PiProcess;
+    try {
+      process = await this.spawn(film, this.store.settings);
+    } catch (error) {
+      // A provider that cannot be described to pi fails before any transcript exists.
+      this.store.patch(film.id, { error: error instanceof Error ? error.message : String(error) });
+      return;
+    }
     const session: Session = { process, streaming: false, pendingAsks: new Map() };
     this.sessions.set(film.id, session);
     process.onLine((line) => {
       const event = parse(line);
       if (event) this.apply(film.id, session, event);
     });
-    process.onExit((code) => {
+    process.onExit((code, stderr) => {
       // A session replaced by a restart, or removed with its film, exits quietly.
       if (this.sessions.get(film.id) !== session) return;
       this.sessions.delete(film.id);
       const current = this.store.film(film.id);
       if (current && current.stage !== "ready" && !current.paused && !current.heldByYou) {
-        this.store.patch(film.id, { error: code ? `The agent stopped (exit ${code}).` : "The agent stopped before the film was ready." });
+        const tail = stderr.trim().split("\n").slice(-3).join(" ").slice(0, 400);
+        this.store.patch(film.id, { error: code ? `The agent stopped (exit ${code}).${tail ? ` ${tail}` : ""}` : "The agent stopped before the film was ready." });
       }
     });
     send(session, { type: "prompt", message: prompt });

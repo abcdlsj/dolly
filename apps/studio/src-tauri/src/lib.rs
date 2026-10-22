@@ -39,6 +39,9 @@ struct Line {
 struct Exit {
     id: String,
     code: Option<i32>,
+    /// Whatever pi printed on stderr; an agent that dies before its first turn
+    /// explains itself only here.
+    stderr: String,
 }
 
 /// The environment variable each provider's key goes in.
@@ -86,17 +89,54 @@ fn sidecar_dir() -> PathBuf {
 }
 
 #[tauri::command]
-fn pi_start(app: AppHandle, agents: State<Agents>, id: String, args: Vec<String>, provider: String) -> Result<(), String> {
+fn pi_start(
+    app: AppHandle,
+    agents: State<Agents>,
+    id: String,
+    args: Vec<String>,
+    provider: String,
+    endpoint: Option<String>,
+    model: Option<String>,
+) -> Result<(), String> {
     let path = search_path(&sidecar_dir());
-    let pi = find_on(&path, "pi").ok_or("pi is not installed. Install it with: npm install -g @mariozechner/pi-coding-agent")?;
+    let pi = find_on(&path, "pi").ok_or("pi is not installed. Install it with: npm install -g @earendil-works/pi-coding-agent")?;
     let mut command = Command::new(pi);
-    command.args(&args).env("PATH", &path).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null());
-    if let Some(key) = secret(&provider) {
-        command.env(key_variable(&provider), key);
+    command.args(&args).env("PATH", &path).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
+    let key = secret(&provider);
+    match (endpoint.filter(|value| !value.trim().is_empty()), key.as_deref()) {
+        // An OpenAI-compatible address is described to pi the way pi describes
+        // any endpoint it does not know: a provider in models.json. It lives in
+        // the app's own agent directory, so the person's ~/.pi stays untouched.
+        (Some(base), Some(key)) => {
+            let model = model.filter(|value| !value.trim().is_empty() && value != "Recommended").ok_or("Set a model for this address")?;
+            let dir = app.path().app_data_dir().map_err(|error| error.to_string())?.join("agent");
+            std::fs::create_dir_all(&dir).map_err(|error| error.to_string())?;
+            let config = serde_json::json!({
+                "$schema": "https://pi.dev/schemas/models.schema.json",
+                "providers": {
+                    "dolly": {
+                        "baseUrl": base.trim(),
+                        "api": "openai-completions",
+                        "apiKey": "$DOLLY_API_KEY",
+                        "models": [{ "id": model }],
+                    }
+                }
+            });
+            std::fs::write(dir.join("models.json"), serde_json::to_vec_pretty(&config).map_err(|error| error.to_string())?)
+                .map_err(|error| error.to_string())?;
+            command.env("PI_CODING_AGENT_DIR", &dir).env("DOLLY_API_KEY", key);
+        }
+        (Some(_), None) => return Err("No key yet".into()),
+        (None, key) => {
+            if let Some(key) = key {
+                command.env(key_variable(&provider), key);
+            }
+        }
     }
     let mut child = command.spawn().map_err(|error| format!("could not start pi: {error}"))?;
     let stdin = child.stdin.take().ok_or("pi has no stdin")?;
     let stdout = child.stdout.take().ok_or("pi has no stdout")?;
+    let stderr = child.stderr.take().ok_or("pi has no stderr")?;
 
     let mut agents = agents.0.lock().map_err(|_| "agents lock poisoned")?;
     if let Some(mut old) = agents.remove(&id) {
@@ -108,6 +148,16 @@ fn pi_start(app: AppHandle, agents: State<Agents>, id: String, args: Vec<String>
 
     std::thread::spawn(move || {
         // pi frames records with \n only; a record may hold U+2028, which lines() keeps intact.
+        let errors = std::sync::Arc::new(std::sync::Mutex::new(String::new()));
+        let sink = errors.clone();
+        std::thread::spawn(move || {
+            for line in BufReader::new(stderr).lines().map_while(Result::ok) {
+                if let Ok(mut text) = sink.lock() {
+                    text.push_str(&line);
+                    text.push('\n');
+                }
+            }
+        });
         for line in BufReader::new(stdout).lines().map_while(Result::ok) {
             let _ = app.emit("pi-line", Line { id: id.clone(), line });
         }
@@ -118,7 +168,8 @@ fn pi_start(app: AppHandle, agents: State<Agents>, id: String, args: Vec<String>
         // An agent replaced by a restart exits quietly, so the new one keeps its listeners.
         let Some(mut agent) = agent else { return };
         let code = agent.child.wait().ok().and_then(|status| status.code());
-        let _ = app.emit("pi-exit", Exit { id, code });
+        let stderr = errors.lock().map(|text| text.clone()).unwrap_or_default();
+        let _ = app.emit("pi-exit", Exit { id, code, stderr });
     });
     Ok(())
 }

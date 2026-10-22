@@ -125,24 +125,29 @@ export async function chooseApp(): Promise<InstalledApp | null> {
 export const spawnPi: Spawn = async (film, settings) => {
   const { listen } = await import("@tauri-apps/api/event");
   const paths = await invoke<{ skill: string; extension: string; sessions: string }>("agent_paths");
+  // An OpenAI-compatible address becomes pi's own `dolly` provider, described
+  // in a models.json the Rust side writes; the named providers are pi's.
+  const custom = settings.provider === "custom";
+  const endpoint = custom ? settings.endpoint.trim() : "";
+  if (custom && !endpoint) throw new Error("Set the provider's address in Settings.");
   const args = piArgs({
     skill: paths.skill,
     extension: paths.extension,
     sessionDir: `${paths.sessions}/${film.id}`,
-    provider: settings.provider === "custom" ? "" : settings.provider,
+    provider: custom ? "dolly" : settings.provider,
     model: settings.model,
   });
-  await invoke("pi_start", { id: film.id, args, provider: settings.provider });
+  await invoke("pi_start", { id: film.id, args, provider: settings.provider, endpoint, model: settings.model });
   const lines = new Set<(line: string) => void>();
-  const exits = new Set<(code: number | null) => void>();
+  const exits = new Set<(code: number | null, stderr: string) => void>();
   const stopLines = await listen<{ id: string; line: string }>("pi-line", (event) => {
     if (event.payload.id === film.id) for (const listener of lines) listener(event.payload.line);
   });
-  const stopExit = await listen<{ id: string; code: number | null }>("pi-exit", (event) => {
+  const stopExit = await listen<{ id: string; code: number | null; stderr: string }>("pi-exit", (event) => {
     if (event.payload.id !== film.id) return;
     stopLines();
     stopExit();
-    for (const listener of exits) listener(event.payload.code);
+    for (const listener of exits) listener(event.payload.code, event.payload.stderr ?? "");
   });
   const process: PiProcess = {
     // The Rust side ends each record with its own "\n".

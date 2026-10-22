@@ -7,7 +7,7 @@ import { FakeClock, MARGIN, until } from "./helpers.ts";
 class FakePi implements PiProcess {
   sent: Record<string, unknown>[] = [];
   private lines = new Set<(line: string) => void>();
-  private exits = new Set<(code: number | null) => void>();
+  private exits = new Set<(code: number | null, stderr: string) => void>();
   killed = false;
 
   send(line: string) {
@@ -16,7 +16,7 @@ class FakePi implements PiProcess {
   onLine(listener: (line: string) => void) {
     this.lines.add(listener);
   }
-  onExit(listener: (code: number | null) => void) {
+  onExit(listener: (code: number | null, stderr: string) => void) {
     this.exits.add(listener);
   }
   kill() {
@@ -25,8 +25,8 @@ class FakePi implements PiProcess {
   emit(event: Record<string, unknown>) {
     for (const listener of this.lines) listener(JSON.stringify(event));
   }
-  exit(code: number | null) {
-    for (const listener of this.exits) listener(code);
+  exit(code: number | null, stderr = "") {
+    for (const listener of this.exits) listener(code, stderr);
   }
 }
 
