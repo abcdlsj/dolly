@@ -1,3 +1,4 @@
-# The dolly sidecar, copied here by scripts/sidecar.ts with the target triple in its name.
+# The `dolly` sidecar and its `dolly-driver`, copied here by
+# scripts/sidecar.ts with the target triple in their names.
 *
 !.gitignore
