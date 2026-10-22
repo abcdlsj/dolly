@@ -132,6 +132,15 @@ behaviour (travel, easing, guard, trust) lives in `Input.swift` and `CLI.swift`.
 `icon-small.svg` (simplified for 32 px and below) and `AppIcon.svg` on the
 macOS 1024/824 grid, which `AppIcon.icns` is rendered from.
 
+## Site
+
+`site/` is a static onboarding page — no build, no dependencies. Open
+`site/index.html`, or serve it with `python3 -m http.server -d site`. Its
+animations are canvas: `site/js/camera.js` ports the camera planner from
+`scripts/camera.py` (eases, spline, padding, ceiling, named moves and the
+`--explain` checks), so the moves it shows are the moves `camera.py` renders.
+`tests/test_site_camera.py` checks the two plan the same shots (needs node).
+
 ## Licence
 
 MIT.

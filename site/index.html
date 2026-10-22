@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>dolly</title>
+  <meta name="description" content="Real input and eased camera moves for macOS screen recordings.">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..900&family=JetBrains+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="bar">
+    <a class="mark" href="#top"><img src="icon.svg" alt="" width="26" height="26">dolly</a>
+    <a href="https://github.com/abcdlsj/dolly">GitHub ↗</a>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <h1>Camera moves<br>for screen recordings.</h1>
+      <p class="lede">Real pointer input on macOS. Push-ins, pans and pull-backs in post. Every move is a number.</p>
+      <div class="frame">
+        <canvas id="hero" class="r169" aria-label="A card dragged to Done while the camera pushes in, follows and pulls back"></canvas>
+      </div>
+    </section>
+
+    <section class="row">
+      <div class="copy">
+        <h2>Drive</h2>
+        <p>Hover, click, drag. Real events, eased, guarded to one app.</p>
+      </div>
+      <div class="visual">
+        <div class="frame"><canvas id="drive" class="r169" aria-label="The pointer hovers a card, then drags it to Done"></canvas></div>
+        <pre class="term" id="drive-terminal"></pre>
+      </div>
+    </section>
+
+    <section class="row">
+      <div class="copy">
+        <h2>Record</h2>
+        <p>One window, 60 fps, focus untouched.</p>
+      </div>
+      <div class="visual">
+        <div class="frame"><canvas id="record" class="r167" aria-label="Frames of the window streaming into a take"></canvas></div>
+      </div>
+    </section>
+
+    <section class="row">
+      <div class="copy">
+        <h2>Move</h2>
+        <p>Crop the 2× take along a spline. Starts soft, lands soft.</p>
+      </div>
+      <div class="visual">
+        <div class="frame"><canvas id="move" class="r169" aria-label="The camera's frame travelling over the take, with the film it produces"></canvas></div>
+      </div>
+    </section>
+
+    <section class="moves" id="moves">
+      <h2>Named moves</h2>
+      <div class="tabs" id="move-tabs" role="tablist"></div>
+      <div class="pair">
+        <div class="frame"><canvas id="moves-overview" class="r169" aria-label="The take with the camera's frame"></canvas></div>
+        <div class="frame"><canvas id="moves-film" class="r169" aria-label="The film"></canvas></div>
+      </div>
+      <canvas id="moves-chart" class="chart" aria-label="Zoom over time"></canvas>
+      <pre class="code" id="move-json"></pre>
+    </section>
+
+    <section class="row formats">
+      <div class="copy">
+        <h2>Any aspect</h2>
+        <p>One take, cut for every feed.</p>
+        <div class="seg" id="aspect-buttons" role="group" aria-label="Aspect">
+          <button data-aspect="16:9" class="on">16:9</button>
+          <button data-aspect="9:16">9:16</button>
+          <button data-aspect="1:1">1:1</button>
+          <button data-aspect="4:5">4:5</button>
+        </div>
+        <div class="seg" id="fit-buttons" role="group" aria-label="Fit">
+          <button data-fit="pad" class="on">pad</button>
+          <button data-fit="crop">crop</button>
+        </div>
+        <p class="note" id="format-note"></p>
+      </div>
+      <div class="visual">
+        <canvas id="format" class="r1610" aria-label="The film in the chosen aspect"></canvas>
+      </div>
+    </section>
+
+    <section class="install" id="install">
+      <h2>Start</h2>
+      <pre class="code copyable">./scripts/install.sh
+alias dolly=~/Applications/Dolly.app/Contents/MacOS/dolly
+dolly trust --prompt
+dolly service start</pre>
+      <p>Then hand <a href="https://github.com/abcdlsj/dolly/blob/main/skills/dolly/SKILL.md">SKILL.md</a> to your agent.</p>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <span>dolly · MIT</span>
+    <a href="https://github.com/abcdlsj/dolly">github.com/abcdlsj/dolly</a>
+  </footer>
+
+  <script src="js/camera.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
