@@ -77,6 +77,7 @@ still goes one call at a time.
 | `snap <windowID\|--pid n> <out.png>` | one frame of a window to look at, with the `scale` back to screen points |
 | `tree <pid>` | the window's controls: role, texts, actions, screen frame, `center` and shot-file `rect` |
 | `events start <file>\|stop\|status` | log input and capture times during a take; `stop` returns them as beats |
+| `release` | lift every mouse button and modifier key, e.g. after a take is stopped mid-drag |
 | `camera …` | eased camera moves over a recording (below) |
 
 Shared flags: `--guard <pid|bundle|name>` (refuse unless that app is frontmost),

@@ -233,3 +233,23 @@ export const type = verb({
   },
   log: ({ text }) => ({ characters: [...text].length }),
 });
+
+/** Virtual key codes of the modifier keys, left side (macOS numbering, which drivers translate). */
+const MODIFIER_KEYS = { cmd: 55, shift: 56, alt: 58, ctrl: 59 } as const;
+
+export const release = verb({
+  name: "release",
+  summary: "lift every mouse button and modifier key, e.g. after a take is stopped mid-drag",
+  usage: "dolly release",
+  parse: () => ({}),
+  async run(_, ctx) {
+    await requireTrust(ctx);
+    const buttons: Button[] = ["left", "right", "middle"];
+    const steps: InputStep[] = [
+      ...buttons.map((button) => ({ ms: 0, type: "up" as const, button, clicks: 1, modifiers: [] })),
+      ...Object.values(MODIFIER_KEYS).map((code) => ({ ms: 0, type: "key" as const, code, down: false, modifiers: [] })),
+    ];
+    await play(ctx, steps);
+    return { released: [...buttons, ...Object.keys(MODIFIER_KEYS)] };
+  },
+});

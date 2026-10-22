@@ -104,6 +104,13 @@ describe("pointer", () => {
     expect(steps(ctx.driver).at(-1)).toMatchObject({ text: "hello world" });
   });
 
+  test("release lifts every button and modifier without a guard", async () => {
+    const ctx = fakeContext();
+    expect(await run(["release"], ctx)).toMatchObject({ ok: true, released: ["left", "right", "middle", "cmd", "shift", "alt", "ctrl"] });
+    expect(steps(ctx.driver).map((s) => s.type)).toEqual(["up", "up", "up", "key", "key", "key", "key"]);
+    expect(steps(ctx.driver).every((s) => s.type !== "key" || !s.down)).toBe(true);
+  });
+
   test("bad input is a usage error before anything is posted", async () => {
     for (const argv of [["move"], ["move", "a,b"], ["click", "1,1", "--button", "thumb"], ["click", "1,1", "--ease", "wobbly"], ["key", "enter"]]) {
       const ctx = fakeContext();

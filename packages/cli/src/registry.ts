@@ -1,7 +1,7 @@
 // Every verb, in the order `help` lists them. Adding a verb is one file in
 // verbs/ and one line here.
 
-import { click, drag, hover, key, move, path, scroll, type } from "./verbs/input.ts";
+import { click, drag, hover, key, move, path, release, scroll, type } from "./verbs/input.ts";
 import { controls, find, focus, launch, place, press, quit, resize, tree } from "./verbs/apps.ts";
 import { capture, record, snap } from "./verbs/capture.ts";
 import { camera } from "./verbs/camera.ts";
@@ -11,7 +11,7 @@ import { front, trust, windows } from "./verbs/system.ts";
 import type { Verb } from "./verb.ts";
 
 export const VERBS = {
-  move, path, hover, click, drag, scroll, key, type,
+  move, path, hover, click, drag, scroll, key, type, release,
   press, find, controls, tree, focus, place, resize,
   front, windows, trust,
   launch, quit, snap,
