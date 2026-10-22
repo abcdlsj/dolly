@@ -5,7 +5,8 @@ import { useMemo, useState } from "react";
 import { liveShot, needsYou, progress, statusLine } from "../model/store.ts";
 import type { Film } from "../model/types.ts";
 import { useSnapshot, useStudio } from "../state.tsx";
-import { Plus, Search } from "../ui/icons.tsx";
+import { openPanel } from "../platform.ts";
+import { Gear, Plus, Search } from "../ui/icons.tsx";
 import { Menu, type MenuItem } from "../ui/menu.tsx";
 import { clock } from "../ui/film.tsx";
 import { filmTitle } from "../ui/words.ts";
@@ -61,6 +62,7 @@ export function Library({ onOpen, onNew }: { onOpen: (film: Film) => void; onNew
           </label>
         )}
         <button type="button" className="btn primary" onClick={onNew}><Plus />New Film</button>
+        <button type="button" className="icon-btn" aria-label="Settings" onClick={() => openPanel("settings")}><Gear /></button>
       </header>
 
       {films.length === 0 ? (

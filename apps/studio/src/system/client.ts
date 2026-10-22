@@ -14,7 +14,11 @@ export interface DollyClient {
 
 /** Whether Accessibility is allowed; with `prompt`, asks macOS to show its dialog. */
 export async function trusted(client: DollyClient, prompt = false): Promise<boolean> {
-  const output = await client.run(prompt ? ["trust", "--prompt", "--wait", "0"] : ["trust"]);
+  // The request is attributed to the driver process, and macOS only records a
+  // grant while that process is alive: `--wait 0` exits on the spot, so the
+  // dialog closes before the toggle can land and System Settings keeps a row
+  // that grants nothing. Stay up long enough to actually be toggled.
+  const output = await client.run(prompt ? ["trust", "--prompt", "--wait", "45"] : ["trust"]);
   return output.ok && output.trusted === true;
 }
 

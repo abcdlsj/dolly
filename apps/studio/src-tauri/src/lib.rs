@@ -13,7 +13,7 @@ use std::time::Instant;
 use serde::Serialize;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, State, WindowEvent};
+use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, RunEvent, State, WindowEvent};
 
 const KEYCHAIN: &str = "Dolly Studio";
 
@@ -404,6 +404,13 @@ pub fn run() {
             }
             _ => {}
         })
-        .run(tauri::generate_context!())
-        .expect("error while running Dolly Studio");
+        .build(tauri::generate_context!())
+        .expect("error while building Dolly Studio")
+        .run(|app, event| {
+            // Closing a window only hides it, and a Dock click asks a running app
+            // to reopen: without this, Dolly looks like it refuses to start.
+            if let RunEvent::Reopen { .. } = event {
+                show_window(app.clone(), "main".into());
+            }
+        });
 }

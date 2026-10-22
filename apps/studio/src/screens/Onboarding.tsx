@@ -36,10 +36,13 @@ export function Onboarding() {
   const steps = [
     { name: "Screen Recording", detail: "So Dolly can film the app.", done: allowed.screen, action: "Open Settings…", run: () => askPermission("screen") },
     { name: "Accessibility", detail: "So Dolly can click and type in the app it films.", done: allowed.accessibility, action: "Open Settings…", run: () => askPermission("accessibility") },
-    { name: "AI provider", detail: "Your own key from Anthropic, OpenAI or another provider.", done: !!settings.keyHint, action: "Add Key…", run: () => setEditing(true) },
+    { name: "AI provider", detail: "Optional — a key from Anthropic, OpenAI or another provider. You can add it later in Settings.", done: !!settings.keyHint, action: "Add Key…", run: () => setEditing(true) },
   ];
   const current = steps.findIndex((step) => !step.done);
   const ready = current === -1;
+  // The key is the one step that can wait: a film needs it, but looking around
+  // does not, and a first launch should not turn into a signup form.
+  const permitted = allowed.screen && allowed.accessibility;
 
   return (
     <div className="welcome-ground">
@@ -78,16 +81,16 @@ export function Onboarding() {
                   onBlur={() => void save()}
                 />
               ) : (
-                <button type="button" className={index === current ? "btn small primary" : "btn small"} onClick={step.run}>{step.action}</button>
+                <button type="button" className={index === current && index < 2 ? "btn small primary" : "btn small"} onClick={step.run}>{step.action}</button>
               )}
             </li>
           ))}
         </ol>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <span className="spacer mute" style={{ fontSize: 12 }}>
-            {ready ? "All set." : current === 2 ? "Dolly uses your key only to talk to the model you choose." : "This updates on its own once you allow access."}
+            {permitted ? (ready ? "All set." : "You can add a key later in Settings.") : "This updates on its own once you allow access."}
           </span>
-          <button type="button" className="btn primary" disabled={!ready} onClick={() => studio.updateSettings({ onboarded: true })}>Continue</button>
+          <button type="button" className="btn primary" disabled={!permitted} onClick={() => studio.updateSettings({ onboarded: true })}>Continue</button>
         </div>
       </div>
     </div>
