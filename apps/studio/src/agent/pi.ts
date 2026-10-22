@@ -50,7 +50,8 @@ export class PiDirector implements Director {
   private store!: Store;
   private sessions = new Map<string, Session>();
 
-  constructor(private spawn: Spawn, private clock: Clock = realClock) {}
+  /** `release` lets go of any mouse button or key the agent's last command was holding. */
+  constructor(private spawn: Spawn, private clock: Clock = realClock, private release: () => Promise<void> = async () => {}) {}
 
   attach(store: Store): () => void {
     this.store = store;
@@ -82,8 +83,9 @@ export class PiDirector implements Director {
       }
       case "pause":
       case "takeover":
-        // Aborting kills the agent's running `dolly` command, which lets go of the mouse.
+        // Abort first so no new input starts, then lift anything still held down.
         session && send(session, { type: "abort" });
+        await this.release().catch(() => {});
         break;
       case "resume":
         await this.say(film, "The person handed control back. Check the app's state with a snapshot, then continue the film from where you stopped.");

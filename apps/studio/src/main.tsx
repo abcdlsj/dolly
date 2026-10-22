@@ -4,11 +4,11 @@
 import { StrictMode, useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { RemoteStudio, serve, type Destination } from "./bridge.ts";
-import type { Director } from "./agent/director.ts";
+import { realClock, type Director } from "./agent/director.ts";
 import { PiDirector } from "./agent/pi.ts";
 import { SimulatedDirector } from "./agent/simulated.ts";
 import { liveShot, shotNumber, Store, type Snapshot } from "./model/store.ts";
-import { channel, hidePanel, isTauri, notify, openPanel, route, setTrayTitle, spawnPi } from "./platform.ts";
+import { channel, dolly, hidePanel, isTauri, notify, openPanel, route, setTrayTitle, spawnPi } from "./platform.ts";
 import { Film } from "./screens/Film.tsx";
 import { Library } from "./screens/Library.tsx";
 import { NewFilm } from "./screens/NewFilm.tsx";
@@ -50,7 +50,7 @@ function direct(store: Store): void {
   const demo = new URLSearchParams(location.search).has("demo");
   const wantsPi = () => isTauri && !demo && !!store.settings.keyHint;
   let usingPi = wantsPi();
-  const make = (): Director => (usingPi ? new PiDirector(spawnPi) : new SimulatedDirector());
+  const make = (): Director => (usingPi ? new PiDirector(spawnPi, realClock, () => dolly.run(["release"]).then(() => {})) : new SimulatedDirector());
   let stop = make().attach(store);
   store.subscribe(() => {
     if (wantsPi() === usingPi) return;

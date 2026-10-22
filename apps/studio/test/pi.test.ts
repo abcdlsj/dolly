@@ -34,13 +34,14 @@ function setup() {
   const clock = new FakeClock();
   const store = new Store(clock.now);
   const processes: FakePi[] = [];
+  let released = 0;
   const director = new PiDirector(async () => {
     const process = new FakePi();
     processes.push(process);
     return process;
-  }, clock);
+  }, clock, async () => void released++);
   const stop = director.attach(store);
-  return { clock, store, processes, stop };
+  return { clock, store, processes, stop, released: () => released };
 }
 
 const tool = (toolName: string, args: Record<string, unknown>) => ({ type: "tool_execution_start", toolCallId: `call-${toolName}`, toolName, args });
@@ -118,8 +119,8 @@ describe("PiDirector", () => {
     expect(pi.sent.at(-1)).toEqual({ type: "extension_ui_response", id: "ui-7", value: "Use My Folder…" });
   });
 
-  test("pause aborts; a change while it works is a steer", async () => {
-    const { store, processes } = setup();
+  test("pause aborts and lets go of the mouse; a change while it works is a steer", async () => {
+    const { store, processes, released } = setup();
     const id = store.create({ app: MARGIN, formats: ["website"], length: 30, ask: "key", notes: "" });
     await until(() => processes.length === 1);
     const pi = processes[0]!;
@@ -130,6 +131,7 @@ describe("PiDirector", () => {
     store.pause(id);
     await until(() => pi.sent.length === 3);
     expect(pi.sent[2]).toEqual({ type: "abort" });
+    await until(() => released() === 1);
   });
 
   test("the agent quitting early shows an error; starting again opens a new agent", async () => {
