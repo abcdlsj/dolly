@@ -10,3 +10,6 @@ export * from "./review.ts";
 export * from "./filter.ts";
 export * from "./explain.ts";
 export * from "./pointer.ts";
+export * from "./gestures.ts";
+export * from "./windows.ts";
+export * from "./events.ts";

@@ -1,21 +1,19 @@
-#!/usr/bin/env bun
-// Eased camera moves over a window recording; the TS successor of scripts/camera.py.
+// `dolly camera`: eased camera moves over a window recording.
 //
-//   dolly-camera --input take.mp4 --out push-in.mp4 \
+//   dolly camera --input take.mp4 --out push-in.mp4 \
 //       --keys 0:1.0:0.5:0.5 0.4:1.0:0.5:0.5 2.6:1.28:0.18:0.34 --strip strip.jpg
-//   dolly-camera --shot shot.json --out film.mp4
-//   dolly-camera --shot shot.json --explain     # keyframes and warnings, no render
+//   dolly camera --shot shot.json --out film.mp4
+//   dolly camera --shot shot.json --explain     # keyframes and warnings, no render
 //
 // Planning lives in @dolly/core; this file only reads files and runs ffmpeg.
 
 import { spawnSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
-import { dirname, extname, join, resolve } from "node:path";
+import { dirname, extname, join } from "node:path";
 import {
   buildFilter,
   parseAspect,
   parseKeyframe,
-  ShotError,
   shotFor,
   UsageError,
   type BeatSpec,
@@ -23,6 +21,9 @@ import {
   type Key,
   type Size,
 } from "@dolly/core";
+import { Failure } from "../failure.ts";
+import { resolveFile } from "../paths.ts";
+import { verb } from "../verb.ts";
 
 const FLAGS = ["input", "out", "shot", "start", "duration", "fit", "aspect", "fps", "crf", "strip"] as const;
 const SWITCHES = ["frames", "explain", "dry-run"] as const;
@@ -33,7 +34,7 @@ interface Args {
   keys: string[] | null;
 }
 
-export const USAGE = `dolly-camera (--keys t:zoom[:x:y[:ease]] … | --shot file.json|-) [--input clip|dir] [--out file]
+export const USAGE = `dolly camera (--keys t:zoom[:x:y[:ease]] … | --shot file.json|-) [--input clip|dir] [--out file]
   [--frames] [--start s] [--duration s] [--fit pad|crop] [--aspect 16:9] [--fps n] [--crf n]
   [--strip file.jpg] [--explain] [--dry-run]`;
 
@@ -68,12 +69,6 @@ interface ShotFile {
   duration?: number;
   beats?: BeatSpec[];
   output?: { fit?: Fit; aspect?: string; crf?: number };
-}
-
-class Failure extends Error {
-  constructor(message: string, readonly code = 5) {
-    super(message);
-  }
 }
 
 function run(command: string, args: readonly string[]): string {
@@ -114,25 +109,15 @@ export function frameRate(directory: string): number {
   return median ? 1000 / median : 30;
 }
 
-export function main(argv: readonly string[]): { code: number; output: unknown } {
-  try {
-    return { code: 0, output: camera(parseArgs(argv)) };
-  } catch (error) {
-    const code = error instanceof UsageError || error instanceof ShotError ? 2 : error instanceof Failure ? error.code : 5;
-    const prefix = error instanceof ShotError ? "bad shot: " : "";
-    return { code, output: { ok: false, error: prefix + (error as Error).message } };
-  }
-}
-
-function camera(args: Args): unknown {
+function render(args: Args, cwd: string): Record<string, unknown> {
   const { values, switches } = args;
   let shotFile: ShotFile = {};
-  let base = process.cwd();
+  let base = cwd;
   if (values.shot !== undefined) {
     try {
-      const text = values.shot === "-" ? readFileSync(0, "utf8") : readFileSync(values.shot, "utf8");
-      shotFile = JSON.parse(text);
-      if (values.shot !== "-") base = dirname(resolve(values.shot));
+      const path = values.shot === "-" ? "-" : resolveFile(values.shot, cwd);
+      shotFile = JSON.parse(readFileSync(path === "-" ? 0 : path, "utf8"));
+      if (path !== "-") base = dirname(path);
     } catch (error) {
       throw new UsageError(`cannot read shot: ${(error as Error).message}`);
     }
@@ -140,8 +125,9 @@ function camera(args: Args): unknown {
   const output = shotFile.output ?? {};
   const fromShot = (value: unknown) => (typeof value === "string" ? join(base, value) : undefined);
 
-  const sourcePath = values.input ?? fromShot(shotFile.source);
-  const outPath = values.out ?? fromShot(shotFile.out);
+  const fromFlag = (value: string | undefined) => (value === undefined ? undefined : resolveFile(value, cwd));
+  const sourcePath = fromFlag(values.input) ?? fromShot(shotFile.source);
+  const outPath = fromFlag(values.out) ?? fromShot(shotFile.out);
   const frames = switches.has("frames") || Boolean(shotFile.frames);
   const start = values.start !== undefined ? Number(values.start) : Number(shotFile.start ?? 0);
   const duration = values.duration !== undefined ? Number(values.duration) : (shotFile.duration ?? null);
@@ -170,7 +156,7 @@ function camera(args: Args): unknown {
   const length = duration ? Number(duration) : Math.max(takeLength - start, 0) || null;
 
   const shot = shotFor({ source, fit, length, ...(keys ? { keys } : { beats: shotFile.beats ?? [] }) }, out);
-  if (switches.has("explain")) return shot.explain();
+  if (switches.has("explain")) return { ...shot.explain() };
 
   const graph = buildFilter(shot.keys, source, start, duration ? Number(duration) : null, shot.ceiling, fit, out);
   if (switches.has("dry-run")) return { ok: true, filter: graph };
@@ -187,7 +173,7 @@ function camera(args: Args): unknown {
   let strip: string | null = null;
   if (values.strip) {
     const stripLength = length || probe(outPath!).length || 1;
-    strip = values.strip;
+    strip = resolveFile(values.strip, cwd);
     run("ffmpeg", [
       "-hide_banner", "-loglevel", "error", "-y", "-i", outPath!,
       "-vf", `fps=5/${Math.max(stripLength, 0.1).toFixed(3)},scale=480:-1,tile=5x1`, "-frames:v", "1", strip,
@@ -210,8 +196,11 @@ function camera(args: Args): unknown {
   };
 }
 
-if (import.meta.main) {
-  const { code, output } = main(process.argv.slice(2));
-  console.log(JSON.stringify(output));
-  process.exit(code);
-}
+export const camera = verb({
+  name: "camera",
+  summary: "render eased camera moves over a recording, or explain a shot file",
+  usage: USAGE,
+  // Camera takes its own flags (`--keys` is a list), so it reads raw argv.
+  parse: (_, argv) => ({ argv: [...argv] }),
+  run: async ({ argv }, ctx) => render(parseArgs(argv), ctx.cwd),
+});

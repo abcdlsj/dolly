@@ -1,4 +1,4 @@
-// dolly-camera against synthetic takes: a grey window with one red marker.
+// `dolly camera` against synthetic takes: a grey window with one red marker.
 // The render cases need ffmpeg and skip without it.
 
 import { afterAll, describe, expect, test } from "bun:test";
@@ -6,9 +6,11 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { frameRate, main } from "../src/camera.ts";
+import { fakeContext } from "../src/fake.ts";
+import { run as runArgv } from "../src/run.ts";
+import { frameRate } from "../src/verbs/camera.ts";
 
-const SCRIPT = join(import.meta.dir, "..", "src", "camera.ts");
+const MAIN = join(import.meta.dir, "..", "src", "main.ts");
 const HAS_FFMPEG = spawnSync("ffmpeg", ["-version"]).status === 0 && spawnSync("ffprobe", ["-version"]).status === 0;
 const directory = mkdtempSync(join(tmpdir(), "dolly-camera-"));
 afterAll(() => rmSync(directory, { recursive: true, force: true }));
@@ -58,16 +60,17 @@ function stream(file: string) {
 }
 
 function run(...args: string[]) {
-  const result = spawnSync("bun", [SCRIPT, ...args], { encoding: "utf8" });
+  const result = spawnSync("bun", [MAIN, "camera", ...args], { encoding: "utf8" });
   return { code: result.status, json: JSON.parse(result.stdout) };
 }
 
 describe("arguments", () => {
-  test("usage errors exit 2 with one JSON object", () => {
-    expect(main([])).toMatchObject({ code: 2, output: { ok: false } });
-    expect(main(["--keys", "0:1", "--shot", "x.json"])).toMatchObject({ code: 2 });
-    expect(main(["--keys", "nope", "--input", "x.mp4", "--explain"])).toMatchObject({ code: 2 });
-    expect(main(["--keys", "0:1", "--wat"])).toMatchObject({ code: 2 });
+  test("usage errors exit 2 with one JSON object", async () => {
+    const camera = (...args: string[]) => runArgv(["camera", ...args], fakeContext());
+    expect(await camera()).toMatchObject({ code: 2, ok: false, command: "camera" });
+    expect(await camera("--keys", "0:1", "--shot", "x.json")).toMatchObject({ code: 2 });
+    expect(await camera("--keys", "nope", "--input", "x.mp4", "--explain")).toMatchObject({ code: 2 });
+    expect(await camera("--keys", "0:1", "--wat")).toMatchObject({ code: 2 });
   });
 
   test("the frame rate comes from the stamps", () => {

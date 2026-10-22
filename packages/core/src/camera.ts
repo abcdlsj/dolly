@@ -2,7 +2,7 @@
 
 import { Channel } from "./channel.ts";
 import { CAMERA_EASE_NAMES, isCameraEase, type CameraEase } from "./eases.ts";
-import { canvas, clamp, UsageError, type Fit, type Size } from "./geometry.ts";
+import { canvas, clamp, UsageError, type Canvas, type Fit, type Size } from "./geometry.ts";
 
 /**
  * At time `t` the frame shows the window point (`x`, `y`), normalised 0..1, at
@@ -47,11 +47,14 @@ export class Camera {
     readonly y: Channel,
     readonly ceiling: number,
     readonly out: Size,
+    /** The canvas the window was padded or cropped to, which `view` is normalised to. */
+    readonly canvas: Canvas,
   ) {}
 
   static build(keys: readonly Key[], source: Size, fit: Fit, ceiling: number, out: Size): Camera {
     const [srcW, srcH] = source;
-    const [canW, canH, offX, offY] = canvas(source, fit, out);
+    const frame = canvas(source, fit, out);
+    const [canW, canH, offX, offY] = frame;
     const times = keys.map((k) => k.t);
     const eases = keys.map((k) => k.ease);
     // Keyframes name a point of the window; the pan works on the canvas, so
@@ -62,6 +65,7 @@ export class Camera {
       Channel.build(times, keys.map((k) => (clamp(k.y, 0, 1) * srcH + offY) / canH), eases),
       ceiling,
       out,
+      frame,
     );
   }
 

@@ -10,8 +10,13 @@
     "allowImportingTsExtensions": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "types": ["bun"],
-    "paths": { "@dolly/core": ["./packages/core/src/index.ts"] }
+    "types": ["bun", "node"],
+    "paths": {
+      "@dolly/core": ["./packages/core/src/index.ts"],
+      "@dolly/protocol": ["./packages/protocol/src/index.ts"],
+      "@dolly/cli/client": ["./packages/cli/src/client.ts"],
+      "@dolly/cli/fake": ["./packages/cli/src/fake.ts"]
+    }
   },
   "include": ["packages/*/src", "packages/*/test"]
 }

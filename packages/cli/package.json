@@ -3,6 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "bin": { "dolly-camera": "./src/camera.ts" },
-  "dependencies": { "@dolly/core": "workspace:*" }
+  "bin": {
+    "dolly": "./src/main.ts"
+  },
+  "dependencies": {
+    "@dolly/core": "workspace:*",
+    "@dolly/protocol": "workspace:*"
+  },
+  "exports": {
+    ".": "./src/client.ts",
+    "./client": "./src/client.ts",
+    "./fake": "./src/fake.ts"
+  }
 }
