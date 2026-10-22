@@ -1,0 +1,36 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "jsx": "react-jsx",
+    "types": [
+      "bun",
+      "node",
+      "vite/client"
+    ],
+    "paths": {
+      "@dolly/core": [
+        "../../packages/core/src/index.ts"
+      ],
+      "@dolly/protocol": [
+        "../../packages/protocol/src/index.ts"
+      ],
+      "@dolly/cli/client": [
+        "../../packages/cli/src/client.ts"
+      ],
+      "@dolly/cli/fake": [
+        "../../packages/cli/src/fake.ts"
+      ]
+    }
+  },
+  "include": [
+    "src",
+    "test",
+    "agent",
+    "vite.config.ts"
+  ]
+}

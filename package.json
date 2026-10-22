@@ -3,11 +3,12 @@
   "private": true,
   "type": "module",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "apps/*"
   ],
   "scripts": {
     "test": "bun test",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p apps/studio/tsconfig.json --noEmit",
     "build:site": "bun build site/src/camera.ts --format iife --outfile site/js/camera.js",
     "build:cli": "bun build packages/cli/src/main.ts --compile --outfile .build/dolly"
   },
