@@ -82,6 +82,15 @@ describe("PiDirector", () => {
     expect(text).toContain("Only ask when you cannot continue");
   });
 
+  test("a film in the person's own copy says so, and never switches to it on its own", () => {
+    const store = new Store();
+    const id = store.create({ app: MARGIN, formats: ["website"], length: 30, ask: "key", notes: "", privateCopy: false });
+    const text = brief(store.film(id)!, store.settings);
+    expect(text).not.toContain("--isolated");
+    expect(text).toContain("the person chose their own copy");
+    expect(store.film(id)!.privateCopy).toBe(false);
+  });
+
   test("film tool calls become the stage, the direction and the shots", async () => {
     const { store, processes } = setup();
     const id = store.create({ app: MARGIN, formats: ["website"], length: 30, ask: "key", notes: "" });

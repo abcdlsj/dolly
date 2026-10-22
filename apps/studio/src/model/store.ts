@@ -20,6 +20,8 @@ export interface NewFilm {
   length: Length;
   ask: AskLevel;
   notes: string;
+  /** Whether this film works in a private copy of the app; the default comes from settings. */
+  privateCopy?: boolean;
 }
 
 export interface Snapshot {
@@ -69,9 +71,11 @@ export class Store {
 
   /** Restores saved state. A film that was still being made has lost its agent, so it says so. */
   load(snapshot: Snapshot): void {
-    this.films = snapshot.films.map((film) =>
-      film.stage === "ready" || film.error ? film : { ...film, question: null, paused: false, heldByYou: false, error: "Dolly was closed before this film was finished." },
-    );
+    this.films = snapshot.films.map((film) => {
+      // Films made before the choice existed worked in a private copy.
+      const whole: Film = { ...film, privateCopy: film.privateCopy ?? true };
+      return whole.stage === "ready" || whole.error ? whole : { ...whole, question: null, paused: false, heldByYou: false, error: "Dolly was closed before this film was finished." };
+    });
     this.settingsValue = { ...DEFAULT_SETTINGS, ...snapshot.settings };
     this.changed();
   }
@@ -117,7 +121,8 @@ export class Store {
       screens: [],
       shots: [],
       question: null,
-      doing: "Opening a private copy of " + input.app.name,
+      doing: input.privateCopy ? "Opening a private copy of " + input.app.name : "Opening " + input.app.name + " itself",
+      privateCopy: input.privateCopy ?? this.settingsValue.privateCopy,
       frame: null,
       outputs: [],
       paused: false,
@@ -140,7 +145,7 @@ export class Store {
     if (!film) return;
     this.patch(filmId, {
       stage: "explore", line: "", why: "", alternatives: [], screens: [], shots: [], question: null,
-      doing: "Opening a private copy of " + film.app.name, frame: null, outputs: [], paused: false, heldByYou: false,
+      doing: film.privateCopy ? "Opening a private copy of " + film.app.name : "Opening " + film.app.name + " itself", frame: null, outputs: [], paused: false, heldByYou: false,
       etaMinutes: null, error: null, finishedAt: null,
     });
     this.request({ type: "start", filmId });

@@ -27,6 +27,7 @@ export function NewFilm({ onClose, onMade }: { onClose: () => void; onMade: (fil
   const [formats, setFormats] = useState<FormatId[]>(["website", "social"]);
   const [length, setLength] = useState<Length>(30);
   const [ask, setAsk] = useState<AskLevel>(settings.ask);
+  const [privateCopy, setPrivateCopy] = useState(settings.privateCopy);
   const [notes, setNotes] = useState("");
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const sheet = useRef<HTMLDivElement>(null);
@@ -40,7 +41,7 @@ export function NewFilm({ onClose, onMade }: { onClose: () => void; onMade: (fil
 
   const make = () => {
     if (!app || formats.length === 0) return;
-    onMade(studio.create({ app, formats, length, ask, notes }));
+    onMade(studio.create({ app, formats, length, ask, notes, privateCopy }));
   };
 
   useEffect(() => {
@@ -99,7 +100,9 @@ export function NewFilm({ onClose, onMade }: { onClose: () => void; onMade: (fil
           </button>
           <span className="spacer" />
           <span className="mute" style={{ fontSize: 12, lineHeight: 1.5 }}>
-            Dolly works in a private copy of the app. Your own {app?.name === "Margin" ? "notes" : "files"} and accounts are never opened.
+            {privateCopy
+              ? `Dolly works in a private copy of the app. Your own ${app?.name === "Margin" ? "notes" : "files"} and accounts are never opened.`
+              : `Dolly works in your own ${app?.name ?? "app"}: your accounts and files are there, so it can get past a login, but it touches real data.`}
           </span>
         </div>
 
@@ -138,6 +141,19 @@ export function NewFilm({ onClose, onMade }: { onClose: () => void; onMade: (fil
               ))}
             </div>
             <span className="mute" style={{ fontSize: 12, lineHeight: 1.45 }}>{level?.detail}</span>
+          </div>
+
+          <div className="field" style={{ gap: 12 }}>
+            <span className="caps" id="copy-label">The app's data</span>
+            <div className="texttabs" role="radiogroup" aria-labelledby="copy-label" style={{ gap: 22 }}>
+              <button type="button" role="radio" aria-checked={privateCopy} onClick={() => setPrivateCopy(true)}>Private copy</button>
+              <button type="button" role="radio" aria-checked={!privateCopy} onClick={() => setPrivateCopy(false)}>My own</button>
+            </div>
+            <span className="mute" style={{ fontSize: 12, lineHeight: 1.45 }}>
+              {privateCopy
+                ? "Starts empty, so nothing of yours is touched. An app that needs a login may not get in; Dolly will ask."
+                : "Your real copy, with your accounts and files. Use it for an app that cannot run signed out."}
+            </span>
           </div>
 
           <label className="field" style={{ gap: 10 }}>

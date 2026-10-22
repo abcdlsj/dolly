@@ -236,7 +236,7 @@ function Safety() {
         </div>
       </Group>
       <Group title="Control">
-        <Toggle name="Work in a private copy of the app" on={settings.privateCopy} onChange={(privateCopy) => studio.updateSettings({ privateCopy })} />
+        <Toggle name="New films work in a private copy of the app" on={settings.privateCopy} onChange={(privateCopy) => studio.updateSettings({ privateCopy })} />
         <Toggle name="Stop the moment I move the mouse" on={settings.stopOnMouse} onChange={(stopOnMouse) => studio.updateSettings({ stopOnMouse })} />
         <Toggle name="Show where Dolly is clicking" on={settings.showPointer} onChange={(showPointer) => studio.updateSettings({ showPointer })} />
       </Group>

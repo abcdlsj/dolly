@@ -112,6 +112,8 @@ export interface Film {
   frame: string | null;
   /** Exported films, once ready. */
   outputs: string[];
+  /** True when the film works in a private copy of the app, false for the person's own. */
+  privateCopy: boolean;
   paused: boolean;
   /** The person took the mouse and keyboard back. */
   heldByYou: boolean;
