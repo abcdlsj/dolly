@@ -145,7 +145,8 @@ export const spawnPi: Spawn = async (film, settings) => {
     for (const listener of exits) listener(event.payload.code);
   });
   const process: PiProcess = {
-    send: (line) => void invoke("pi_send", { id: film.id, line }),
+    // The Rust side ends each record with its own "\n".
+    send: (line) => void invoke("pi_send", { id: film.id, line: line.replace(/\n$/, "") }),
     onLine: (listener) => lines.add(listener),
     onExit: (listener) => exits.add(listener),
     kill: () => void invoke("pi_kill", { id: film.id }),
