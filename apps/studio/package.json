@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:mac": "bash scripts/build.sh",
     "tauri": "tauri"
   },
   "dependencies": {
