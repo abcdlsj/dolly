@@ -9,7 +9,7 @@ import { etaText, liveShot, shotNumber } from "../model/store.ts";
 import { FORMATS, STAGE_LABEL, STAGES, type Film as FilmData, type FormatId, type Shot } from "../model/types.ts";
 import { reveal } from "../platform.ts";
 import { useNow, useSnapshot, useStudio } from "../state.tsx";
-import { Back, Caret, Inspector as InspectorIcon, PauseGlyph, Play, StepChevron } from "../ui/icons.tsx";
+import { Back, Inspector as InspectorIcon, PauseGlyph, Play, StepChevron } from "../ui/icons.tsx";
 import { clock, Filmstrip, Footage, QuestionLine } from "../ui/film.tsx";
 import { Menu, type MenuItem } from "../ui/menu.tsx";
 import { filmTitle, money, MOVE_NAME, sentences, shapes } from "../ui/words.ts";
@@ -63,6 +63,7 @@ function Making({ film, inspector, onInspector, onBack }: PageProps) {
   const [column, width] = useColumn();
   const [message, setMessage] = useState("");
   const live = liveShot(film);
+  const asked = film.shots.find((shot) => shot.id === film.question?.shotId);
   const stageIndex = STAGES.indexOf(film.stage);
   const held = film.paused || film.heldByYou;
 
@@ -114,7 +115,12 @@ function Making({ film, inspector, onInspector, onBack }: PageProps) {
           <div style={{ width, display: "flex", flexDirection: "column" }}>
             <Footage film={film} width={width} mode="live" rec />
             <div className="shot-line">
-              {live ? (
+              {!live && asked ? (
+                <>
+                  <span style={{ fontWeight: 600 }}>Shot {shotNumber(film, asked.id)} — {asked.title}</span>
+                  <span className="mute ellipsis">{MOVE_NAME[asked.move]} · {clock(asked.seconds)} · waiting for your answer</span>
+                </>
+              ) : live ? (
                 <>
                   <span style={{ fontWeight: 600 }}>Shot {shotNumber(film, live.id)} — {live.title}</span>
                   <span className="mute ellipsis">{MOVE_NAME[live.move]} · {clock(live.seconds)} · {lower(film.doing || live.action)}</span>
@@ -244,7 +250,7 @@ function Ready({ film, inspector, onInspector, onBack }: PageProps) {
               setMenu({ x: box.right, y: box.bottom + 4 });
             }}
           >
-            Export… <Caret />
+            Export…
           </button>
         </div>
       </header>
