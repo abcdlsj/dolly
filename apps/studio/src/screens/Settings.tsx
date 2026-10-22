@@ -96,7 +96,7 @@ function AI() {
 
   const test = async () => {
     setCheck({ state: "testing", text: "Testing…" });
-    const result = await testConnection(settings.provider);
+    const result = await testConnection(settings.provider, settings.endpoint);
     setCheck(result.ok ? { state: "ok", text: `Working · ${result.ms} ms` } : { state: "failed", text: result.error ?? "Not working" });
   };
 

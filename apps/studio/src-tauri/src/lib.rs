@@ -175,20 +175,27 @@ struct Check {
 
 /// Lists the provider's models with the stored key. The key goes to curl on stdin, never in argv.
 #[tauri::command]
-async fn provider_check(provider: String) -> Check {
+async fn provider_check(provider: String, endpoint: Option<String>) -> Check {
     let Some(key) = secret(&provider) else {
         return Check { ok: false, ms: 0, error: Some("No key yet".into()) };
     };
     let (url, header) = match provider.as_str() {
-        "openai" => ("https://api.openai.com/v1/models", format!("Authorization: Bearer {key}")),
-        "openrouter" => ("https://openrouter.ai/api/v1/models", format!("Authorization: Bearer {key}")),
-        "custom" => return Check { ok: true, ms: 0, error: None },
-        _ => ("https://api.anthropic.com/v1/models", format!("x-api-key: {key}\nanthropic-version: 2023-06-01")),
+        "openai" => ("https://api.openai.com/v1/models".to_string(), format!("Authorization: Bearer {key}")),
+        "openrouter" => ("https://openrouter.ai/api/v1/models".to_string(), format!("Authorization: Bearer {key}")),
+        "custom" => {
+            // An OpenAI-compatible endpoint is only known from the address the
+            // person typed, so an empty one is a refusal, not a pass.
+            let Some(base) = endpoint.filter(|value| !value.trim().is_empty()) else {
+                return Check { ok: false, ms: 0, error: Some("No address".into()) };
+            };
+            (models_url(&base), format!("Authorization: Bearer {key}"))
+        }
+        _ => ("https://api.anthropic.com/v1/models".to_string(), format!("x-api-key: {key}\nanthropic-version: 2023-06-01")),
     };
     let started = Instant::now();
     let run = || -> std::io::Result<String> {
         let mut child = Command::new("curl")
-            .args(["-s", "-o", "/dev/null", "-w", "%{http_code}", "--max-time", "10", "-H", "@-", url])
+            .args(["-s", "-o", "/dev/null", "-w", "%{http_code}", "--max-time", "10", "-H", "@-", url.as_str()])
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .spawn()?;
@@ -205,6 +212,12 @@ async fn provider_check(provider: String) -> Check {
         Ok(status) => Check { ok: false, ms, error: Some(format!("Error {status}")) },
         Err(error) => Check { ok: false, ms, error: Some(error.to_string()) },
     }
+}
+
+/// The address a base URL exposes its model list at.
+fn models_url(base: &str) -> String {
+    let base = base.trim().trim_end_matches('/');
+    if base.ends_with("/models") { base.to_string() } else { format!("{base}/models") }
 }
 
 /// Runs the bundled `dolly` with argv and returns the one JSON object it prints.

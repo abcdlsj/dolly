@@ -63,9 +63,9 @@ export async function saveKey(provider: string, key: string): Promise<string> {
   return invoke<string>("secret_set", { provider, key });
 }
 
-export async function testConnection(provider: string): Promise<{ ok: boolean; ms: number; error?: string }> {
+export async function testConnection(provider: string, endpoint = ""): Promise<{ ok: boolean; ms: number; error?: string }> {
   if (!isTauri) return { ok: true, ms: 0 };
-  return invoke("provider_check", { provider });
+  return invoke("provider_check", { provider, endpoint });
 }
 
 /** `dolly` itself: the bundled binary through the Rust side, or a fake in a browser tab. */
