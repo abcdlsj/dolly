@@ -1,0 +1,3 @@
+# The dolly sidecar, copied here by scripts/sidecar.ts with the target triple in its name.
+*
+!.gitignore

@@ -6,7 +6,7 @@ description: Use when filming a macOS app — driving real pointer hovers, drag-
 # Filming a macOS app with dolly
 
 `dolly` posts real HID events on an eased clock and copies frames out of one
-window without stealing focus. `scripts/camera.py` turns the raw take into
+window without stealing focus. `dolly camera` turns the raw take into
 camera moves. Together they replace a static screen recording with a shot that
 moves.
 
@@ -27,6 +27,23 @@ moves.
 Never film the user's live app: start an isolated copy of the app (own config,
 own port, own data directory) and film that one.
 
+## Exploring an app you have not seen
+
+```console
+$ dolly launch <App.app|bundle id> --isolated --size 1440,900   # own profile, waits for the window
+$ dolly snap --pid <pid> look.png                               # read look.png to see the window
+$ dolly tree <pid>                                              # every control: role, title, center, rect
+$ dolly quit <pid>
+```
+
+- Work from `tree`, not from guessing pixels: `center` is the screen point to
+  hover or click, `rect` goes straight into a `focus` beat.
+- After every action that should change the window, `snap` again and look.
+- `snap` reports `scale`; a pixel `(px, py)` in the image is screen point
+  `(frame.x + px / scale, frame.y + py / scale)`.
+- `launch` warns when an app is sandboxed: then `--isolated` cannot move its
+  data, so do not create or delete anything the user would miss.
+
 ## Recording a take
 
 ```console
@@ -45,6 +62,18 @@ down a moment to a third of its speed afterwards. Plan the take as one pass:
 | switch tabs / press a control | `dolly press <pid> "<label>"` (AX) or `dolly click` |
 | leave the shot | hold still 0.4 s |
 
+To aim camera moves at what happened, log the take:
+
+```console
+$ dolly events start /tmp/take/events.jsonl
+$ dolly capture <windowID> /tmp/take/take.mov 8 &    # records while you drive it
+$ dolly hover … ; dolly drag … ; …
+$ dolly events stop      # beats: verb, at/until in seconds of the take, point in window fractions
+```
+
+Use each beat's `at` and `point` for the shot file's beats: start a `focus` on
+the `at` of the hover it explains.
+
 Pace: one beat per 1.5–3 s of finished film. Two beats inside a second reads as
 a glitch, and five seconds of one static frame reads as a crash.
 
@@ -53,7 +82,7 @@ a glitch, and five seconds of one static frame reads as a crash.
 Camera moves are post, never zoomed UI: crop a 2x take, ease the crop, keep the
 text at native resolution.
 
-Write a shot as named moves in a shot file and let `camera.py` turn them into
+Write a shot as named moves in a shot file and let `dolly camera` turn them into
 keyframes. Coordinates are window-normalised (0..1), `rect` is `[x, y, w, h]`.
 
 | move | what it does | fields (defaults) |
@@ -87,8 +116,8 @@ directly. Any beat may set `ease`: `spline` (default), `smooth`, `out`, `in`,
 ```
 
 ```console
-$ scripts/camera.py --shot shot.json --explain   # keyframes, peak speeds, warnings — no render
-$ scripts/camera.py --shot shot.json --strip strip.jpg
+$ dolly camera --shot shot.json --explain   # keyframes, peak speeds, warnings — no render
+$ dolly camera --shot shot.json --strip strip.jpg
 ```
 
 Run `--explain` first and fix every warning: it checks the stillness at both
@@ -98,7 +127,7 @@ do not cover: `--keys t:zoom:x:y[:ease]`.
 
 Rules:
 
-- **Ceiling.** `camera.py` brings the window onto a canvas of the output aspect
+- **Ceiling.** `dolly camera` brings the window onto a canvas of the output aspect
   (`--fit pad` letterboxes, `--fit crop` trims) and reports `ceiling` = canvas
   width ÷ output width; for 16:9:
   a 2x capture of a 1280×800 window gives 1.481 padded, 1.333 cropped. Asking
@@ -133,7 +162,10 @@ the start, the travel and the landing.
 
 ## Adding a verb
 
-`Sources/dolly/Commands.swift`: one `enum` with `name`, `summary`, `usage`,
-`spec` and `run`, then add `<Verb>.spec` to `Registry.all` in `CLI.swift`.
-Reuse `Travel` for anything that moves and `Shared.guardFront` for anything
-that types or clicks.
+One file in `packages/cli/src/verbs/` (or a new export in an existing one):
+`verb({ name, summary, usage, parse, run, log? })`, then one line in
+`packages/cli/src/registry.ts`. Plan anything that moves in `@dolly/core`
+(`moveSteps`, `clickSteps`, `dragSteps`) and send it as one `input` timeline;
+call `requireTrust` and `guardFront` before anything that types or clicks.
+Only when a verb needs something the platform alone can do does it need a new
+op in `packages/protocol` and in each driver. Test it against `FakeDriver`.

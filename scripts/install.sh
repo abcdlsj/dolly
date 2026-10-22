@@ -1,19 +1,21 @@
 #!/bin/bash
-# Builds Dolly.app into ~/Applications and signs it with a stable identity, so
-# the Accessibility grant survives rebuilds. Falls back to ad-hoc signing,
-# which needs the grant again after every rebuild.
+# Builds Dolly.app into ~/Applications: the `dolly` CLI (TypeScript, compiled
+# by bun) next to `dolly-driver` (drivers/macos, Swift), signed with a stable
+# identity so the Accessibility grant survives rebuilds. Falls back to ad-hoc
+# signing, which needs the grant again after every rebuild.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
 target="${DOLLY_INSTALL_DIR:-$HOME/Applications}"
 app="$target/Dolly.app"
 
-swift build -c release --package-path "$root"
-binary="$root/.build/release/dolly"
+swift build -c release --package-path "$root/drivers/macos"
+(cd "$root" && bun install --frozen-lockfile >/dev/null && bun run build:cli >/dev/null)
 
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
-cp "$binary" "$app/Contents/MacOS/dolly"
+cp "$root/drivers/macos/.build/release/dolly-driver" "$app/Contents/MacOS/dolly-driver"
+cp "$root/.build/dolly" "$app/Contents/MacOS/dolly"
 cp "$root/assets/AppIcon.icns" "$app/Contents/Resources/AppIcon.icns"
 
 cat > "$app/Contents/Info.plist" <<'PLIST'
@@ -21,7 +23,7 @@ cat > "$app/Contents/Info.plist" <<'PLIST'
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>CFBundleExecutable</key><string>dolly</string>
+  <key>CFBundleExecutable</key><string>dolly-driver</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundleIdentifier</key><string>dev.abcdlsj.dolly</string>
   <key>CFBundleName</key><string>Dolly</string>
@@ -41,12 +43,12 @@ if [ -z "$identity" ]; then
 fi
 
 if [ -n "$identity" ]; then
-  codesign --force --sign "$identity" --identifier dev.abcdlsj.dolly "$app" >/dev/null
+  codesign --force --deep --sign "$identity" --identifier dev.abcdlsj.dolly "$app" >/dev/null
   echo "signed with: $identity"
 else
-  codesign --force --sign - --identifier dev.abcdlsj.dolly "$app" >/dev/null
+  codesign --force --deep --sign - --identifier dev.abcdlsj.dolly "$app" >/dev/null
   echo "signed ad-hoc: the Accessibility grant must be renewed after each rebuild"
 fi
 
 echo "installed: $app/Contents/MacOS/dolly"
-echo "next: $app/Contents/MacOS/dolly trust --prompt"
+echo "next: $app/Contents/MacOS/dolly service start && $app/Contents/MacOS/dolly trust --prompt"

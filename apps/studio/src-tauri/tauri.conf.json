@@ -1,0 +1,87 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Dolly",
+  "version": "0.1.0",
+  "identifier": "app.dolly.studio",
+  "build": {
+    "beforeDevCommand": "bun run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "bun run build && bun run --cwd ../.. build:cli && bun scripts/sidecar.ts",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "macOSPrivateApi": true,
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "label": "main",
+        "title": "Dolly",
+        "url": "index.html",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 900,
+        "minHeight": 600,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "trafficLightPosition": { "x": 18, "y": 20 }
+      },
+      {
+        "label": "settings",
+        "title": "Settings",
+        "url": "index.html#/settings",
+        "width": 580,
+        "height": 600,
+        "resizable": false,
+        "visible": false,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "minimizable": false,
+        "maximizable": false
+      },
+      {
+        "label": "glance",
+        "title": "Dolly",
+        "url": "index.html#/glance",
+        "width": 300,
+        "height": 190,
+        "visible": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "shadow": true
+      },
+      {
+        "label": "tray",
+        "title": "Dolly",
+        "url": "index.html#/tray",
+        "width": 320,
+        "height": 560,
+        "visible": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "shadow": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' asset: http://asset.localhost data:; style-src 'self' 'unsafe-inline'",
+      "assetProtocol": { "enable": true, "scope": ["$HOME/**", "$TEMP/**", "$APPDATA/**"] }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "category": "Video",
+    "targets": ["app", "dmg"],
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.png"],
+    "externalBin": ["binaries/dolly"],
+    "resources": {
+      "../../../skills/dolly": "skills/dolly",
+      "../agent/studio-extension.ts": "agent/studio-extension.ts"
+    },
+    "macOS": { "minimumSystemVersion": "13.0" }
+  }
+}

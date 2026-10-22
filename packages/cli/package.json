@@ -1,0 +1,18 @@
+{
+  "name": "@dolly/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "dolly": "./src/main.ts"
+  },
+  "dependencies": {
+    "@dolly/core": "workspace:*",
+    "@dolly/protocol": "workspace:*"
+  },
+  "exports": {
+    ".": "./src/client.ts",
+    "./client": "./src/client.ts",
+    "./fake": "./src/fake.ts"
+  }
+}
