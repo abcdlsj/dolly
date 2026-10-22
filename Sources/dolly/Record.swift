@@ -15,7 +15,9 @@ enum Capture {
         let region = "\(Int(frame.origin.x)),\(Int(frame.origin.y)),\(Int(frame.width)),\(Int(frame.height))"
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
-        process.arguments = ["-v", "-V", String(seconds), "-R", region, "-x", file.path]
+        // Window-only: whatever a person drags in front of it cannot leak into
+        // the recording, and the take is exactly the window's pixels.
+        process.arguments = ["-v", "-V", String(seconds), "-l", String(windowID), "-o", "-x", file.path]
         process.standardError = FileHandle.nullDevice
         try process.run()
         process.waitUntilExit()
