@@ -120,6 +120,28 @@ shapes and checks size, frame count and where the camera lands (needs ffmpeg).
 See [`skills/dolly/SKILL.md`](skills/dolly/SKILL.md) for the shot vocabulary
 and the recording workflow.
 
+## TypeScript core
+
+dolly is moving to a TypeScript core with a thin native driver per platform.
+`packages/core` holds everything dolly computes, with no IO: eases, the camera
+spline, canvas and ceiling, named moves, `--explain` review, the ffmpeg graph,
+and pointer travel (a list of timed samples a driver plays back, so every
+platform moves the pointer along the same curve). `packages/cli` holds the
+commands that do IO; `dolly-camera` is the successor of `scripts/camera.py`
+and takes the same flags (`--dry-run` prints `{"ok":true,"filter":…}`).
+
+```console
+$ bun install
+$ bun test                       # core, golden plans and ffmpeg renders
+$ bun run typecheck
+$ bun packages/cli/src/camera.ts --shot shot.json --explain
+```
+
+`packages/core/test/fixtures/golden.json` was recorded from `scripts/camera.py`;
+the core must reproduce its keyframes, warnings and filter graph exactly.
+`scripts/camera.py`, `site/js/camera.js` and the Swift travel loop move onto the
+core in follow-up changes.
+
 ## Extending
 
 `Sources/dolly/Commands.swift` holds one `enum` per verb with a `spec` line; add

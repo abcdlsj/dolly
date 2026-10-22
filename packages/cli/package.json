@@ -1,0 +1,8 @@
+{
+  "name": "@dolly/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": { "dolly-camera": "./src/camera.ts" },
+  "dependencies": { "@dolly/core": "workspace:*" }
+}
