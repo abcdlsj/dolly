@@ -15,7 +15,10 @@ export const Search = () => (
   <svg width="12" height="12" viewBox="0 0 14 14" aria-hidden="true"><circle cx="6" cy="6" r="4.3" {...stroke} strokeWidth="1.4" /><path d="M9.3 9.3 12.5 12.5" {...stroke} strokeWidth="1.4" /></svg>
 );
 export const Gear = () => (
-  <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2.3" {...stroke} strokeWidth="1.3" /><path d="M8 1.8v2M8 12.2v2M1.8 8h2M12.2 8h2M3.6 3.6l1.4 1.4M11 11l1.4 1.4M3.6 12.4 5 11M11 5l1.4-1.4" {...stroke} strokeWidth="1.3" /></svg>
+  <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+    <circle cx="12" cy="12" r="3" {...stroke} strokeWidth="1.7" />
+    <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.11a1.7 1.7 0 0 0-1.1-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.11a1.7 1.7 0 0 0 1.56-1.1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34H9a1.7 1.7 0 0 0 1.03-1.56V3a2 2 0 1 1 4 0v.11a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87V9c.22.63.79 1.1 1.45 1.12H21a2 2 0 1 1 0 4h-.11a1.7 1.7 0 0 0-1.49.88z" {...stroke} strokeWidth="1.7" />
+  </svg>
 );
 export const Play = () => (
   <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3.5 2v10l8.5-5z" fill="currentColor" /></svg>

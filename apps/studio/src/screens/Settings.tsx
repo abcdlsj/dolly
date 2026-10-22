@@ -158,8 +158,8 @@ function AI() {
             </button>
           )}
         </Row>
-        <Row name="Model">
-          <Picker label="Model" value={settings.model} options={provider.models.map((model) => ({ value: model, name: model }))} onChange={(model) => studio.updateSettings({ model })} />
+        <Row name="Model" detail="Any model name the provider accepts.">
+          <ModelField label="Model" value={settings.model} options={provider.models} onChange={(model) => studio.updateSettings({ model })} />
         </Row>
         <Row name="Connection">
           <button type="button" className="value" onClick={() => void test()} disabled={check.state === "testing"}>
@@ -262,6 +262,39 @@ function About() {
 }
 
 /** A native pop-up button drawn as the row's value. */
+function ModelField({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {
+  // A model id is whatever the provider takes, so this is typing with the
+  // provider's own names offered as suggestions, not a closed list.
+  const shown = value === "Recommended" ? "" : value;
+  const [text, setText] = useState(shown);
+  useEffect(() => setText(value === "Recommended" ? "" : value), [value]);
+  const commit = () => {
+    const next = text.trim();
+    if (next !== shown) onChange(next || "Recommended");
+  };
+  return (
+    <label className="value">
+      <span className="sr">{label}</span>
+      <input
+        className="inline"
+        style={{ width: 200, textAlign: "right" }}
+        list="dolly-models"
+        placeholder="Provider default"
+        value={text}
+        onChange={(event) => setText(event.target.value)}
+        onBlur={commit}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") event.currentTarget.blur();
+          if (event.key === "Escape") setText(shown);
+        }}
+      />
+      <datalist id="dolly-models">
+        {options.filter((model) => model !== "Recommended").map((model) => <option key={model} value={model} />)}
+      </datalist>
+    </label>
+  );
+}
+
 function Picker({ label, value, options, onChange }: { label: string; value: string; options: { value: string; name: string }[]; onChange: (value: string) => void }) {
   return (
     <label className="value picker">
