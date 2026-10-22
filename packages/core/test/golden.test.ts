@@ -1,4 +1,4 @@
-// The TS core against plans recorded from scripts/camera.py (fixtures/golden.json).
+// The TS core against plans recorded from the Python camera.py it replaced (fixtures/golden.json).
 // Keyframes, beats, warnings and the ffmpeg graph must match exactly; sampled
 // views to 1e-9, so the switch from Python changes no rendered frame.
 
@@ -16,7 +16,7 @@ interface Case {
   keys?: string[];
 }
 
-describe("matches scripts/camera.py", () => {
+describe("matches the recorded Python planner", () => {
   for (const recorded of golden.cases) {
     const c = recorded.case as Case;
     test(c.name, () => {

@@ -154,7 +154,7 @@ describe("apps and windows", () => {
     const ctx = fakeContext();
     expect(await run(["press", "4711", "new note"], ctx)).toMatchObject({ ok: true, pressed: "AXButton New Note" });
     expect(await run(["press", "4711", "nothing"], ctx)).toMatchObject({ ok: false, code: 5 });
-    expect(await run(["find", "4711", "groceries"], ctx)).toMatchObject({ count: 1 });
+    expect(await run(["find", "4711", "Groceries"], ctx)).toMatchObject({ count: 1 });
     expect(await run(["focus", "4711"], ctx)).toMatchObject({ ok: true, front: 4711 });
     expect(await run(["quit", "4711", "--force"], ctx)).toMatchObject({ running: false, forced: true });
   });

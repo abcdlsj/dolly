@@ -1,8 +1,8 @@
 import CoreGraphics
 import Foundation
 
-/// Window lookup, so a caller can address a single window for capture and
-/// aims its pointer at the window's own geometry.
+/// The window list, front to back as the window server stacks them. Picking
+/// a film's window and hit-testing the pointer happen in TypeScript.
 struct WindowInfo {
     let id: Int
     let pid: pid_t
@@ -49,38 +49,5 @@ enum WindowList {
                 onScreen: (entry[kCGWindowIsOnscreen as String] as? Bool) ?? false
             )
         }
-    }
-
-    static func front() -> WindowInfo? {
-        list().first { $0.onScreen && $0.bounds.width > 1 }
-    }
-
-    /// The frontmost window under a screen point: the one a click would land
-    /// on. Used to refuse input aimed at the wrong app.
-    static func at(_ point: Point) -> WindowInfo? {
-        list().first { window in
-            window.onScreen
-                && window.layer == 0
-                && window.bounds.contains(point.cg)
-                && window.bounds.width > 1
-        }
-    }
-}
-
-/// The largest on-screen window of an app, the usual target for a film: it is
-/// the window whose frame the pointer coordinates are relative to.
-enum Target {
-    static func pick(pid: pid_t, width: Int? = nil, height: Int? = nil) throws -> WindowInfo {
-        let candidates = WindowList.list(pid: pid).filter { window in
-            guard window.onScreen, window.layer == 0 else { return false }
-            if let width, Int(window.bounds.width) != width { return false }
-            if let height, Int(window.bounds.height) != height { return false }
-            return true
-        }
-        let largest = { (window: WindowInfo) in window.bounds.width * window.bounds.height }
-        guard let window = candidates.max(by: { largest($0) < largest($1) }) else {
-            throw Failure("no window for pid \(pid)", code: .failed)
-        }
-        return window
     }
 }

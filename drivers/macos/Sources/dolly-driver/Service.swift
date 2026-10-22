@@ -1,16 +1,18 @@
 import Foundation
 
-/// A launchd-hosted input service.
+/// A launchd-hosted driver service.
 ///
 /// macOS grants Accessibility to a process, not to a terminal, and a child of
 /// an untrusted shell inherits the shell's identity — its events are dropped
 /// without a word. `dolly service start` registers this binary with launchd,
-/// which makes dolly its own responsible process, so every verb keeps working
-/// no matter who calls it. Calls then travel over a UNIX socket.
+/// which makes the driver its own responsible process, so every op keeps
+/// working no matter who calls it. Requests then travel over a UNIX socket,
+/// whose path the CLI passes as `--socket` (it owns the default).
 enum Service {
     static let label = "dev.abcdlsj.dolly"
 
-    static var socketPath: String {
+    static func socketPath(_ given: String?) -> String {
+        if let given, !given.isEmpty { return given }
         if let configured = ProcessInfo.processInfo.environment["DOLLY_SOCKET"], !configured.isEmpty {
             return configured
         }
@@ -21,7 +23,8 @@ enum Service {
 
     // MARK: - Server
 
-    /// Serves one request at a time, which is what a single pointer is anyway.
+    /// Serves requests side by side, so a capture can run while the same
+    /// agent drives the take; `Ops` keeps the input ops in single file.
     static func serve(path: String) throws -> Never {
         try FileManager.default.createDirectory(
             at: URL(fileURLWithPath: path).deletingLastPathComponent(),
@@ -48,26 +51,18 @@ enum Service {
             throw Failure("cannot listen on \(path)", code: .failed)
         }
 
+        let queue = DispatchQueue(label: "dolly.driver", attributes: .concurrent)
         while true {
             let client = accept(listener, nil, nil)
             guard client >= 0 else { continue }
-            handle(client)
-            close(client)
+            queue.async {
+                if let line = readLine(client) { writeLine(client, Ops.handle(line)) }
+                close(client)
+            }
         }
     }
 
-    private static func handle(_ client: Int32) {
-        guard let line = readLine(client),
-              let request = try? JSONSerialization.jsonObject(with: line) as? [String: Any],
-              let argv = request["argv"] as? [String] else {
-            writeLine(client, Data("{\"code\":2,\"error\":\"bad request\",\"ok\":false}\n".utf8))
-            return
-        }
-        let result = Runner.run(argv: argv)
-        writeLine(client, Output.encode(command: result.fields["command"] as? String, result: result))
-    }
-
-    private static func readLine(_ fd: Int32) -> Data? {
+    static func readLine(_ fd: Int32) -> Data? {
         var buffer = Data()
         var byte: UInt8 = 0
         while read(fd, &byte, 1) == 1 {
@@ -78,7 +73,7 @@ enum Service {
         return buffer.isEmpty ? nil : buffer
     }
 
-    private static func writeLine(_ fd: Int32, _ data: Data) {
+    static func writeLine(_ fd: Int32, _ data: Data) {
         data.withUnsafeBytes { raw in
             guard let base = raw.baseAddress else { return }
             var sent = 0
@@ -92,12 +87,11 @@ enum Service {
 
     // MARK: - Client
 
-    /// Forwards one call to the service and returns its answer verbatim.
-    static func forward(argv: [String], socket path: String) throws -> Data {
+    /// Whether a service answers on the path, without spending an input.
+    static func isRunning(socket path: String) -> Bool {
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
-        guard fd >= 0 else { throw Failure("socket() failed", code: .failed) }
+        guard fd >= 0 else { return false }
         defer { close(fd) }
-
         var address = sockaddr_un()
         address.sun_family = sa_family_t(AF_UNIX)
         address.sun_len = UInt8(MemoryLayout<sockaddr_un>.size)
@@ -110,27 +104,14 @@ enum Service {
         let connected = withUnsafePointer(to: &address) { pointer in
             pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) { connect(fd, $0, size) }
         }
-        guard connected == 0 else {
-            throw Failure("no service at \(path); run dolly service start", code: .failed)
-        }
-
-        let request = try JSONSerialization.data(withJSONObject: ["argv": argv]) + Data("\n".utf8)
-        writeLine(fd, request)
-        guard let response = readLine(fd) else {
-            throw Failure("service closed the connection", code: .failed)
-        }
-        return response + Data("\n".utf8)
-    }
-
-    /// Whether a service answers on the path, without spending an input.
-    static func isRunning(socket path: String) -> Bool {
-        (try? forward(argv: ["front"], socket: path)) != nil
+        guard connected == 0 else { return false }
+        writeLine(fd, Data("{\"op\":\"pointer\"}\n".utf8))
+        return readLine(fd) != nil
     }
 
     // MARK: - Lifecycle
 
-    static func start() throws -> [String: Any] {
-        let path = socketPath
+    static func start(socket path: String) throws -> [String: Any] {
         let binary = Bundle.main.executablePath ?? CommandLine.arguments[0]
         launchctl(["remove", label])
         let submitted = launchctl(["submit", "-l", label, "--", binary, "serve", "--socket", path])
@@ -149,8 +130,7 @@ enum Service {
         return ["running": false]
     }
 
-    static func status() -> [String: Any] {
-        let path = socketPath
+    static func status(socket path: String) -> [String: Any] {
         return ["socket": path, "running": isRunning(socket: path), "pid": pid()]
     }
 

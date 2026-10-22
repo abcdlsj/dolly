@@ -18,5 +18,5 @@
       "@dolly/cli/fake": ["./packages/cli/src/fake.ts"]
     }
   },
-  "include": ["packages/*/src", "packages/*/test"]
+  "include": ["packages/*/src", "packages/*/test", "site/src"]
 }

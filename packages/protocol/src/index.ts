@@ -79,7 +79,7 @@ export interface Ops {
   /** Plays a timeline and returns once its last step is posted. */
   input: { params: { steps: InputStep[] }; result: { posted: number; dropped: number; ms: number } };
 
-  /** Controls whose title, description, help or value contains `label`, case-insensitively. */
+  /** Controls whose title, description, help or value equals `label`, case-insensitively. */
   find: { params: { pid: number; label: string }; result: { matches: string[] } };
   /** Performs AXPress (or the platform's default action) on the first match. */
   press: { params: { pid: number; label: string }; result: { pressed: string } };

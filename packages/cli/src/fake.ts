@@ -71,7 +71,7 @@ export class FakeDriver implements Driver {
       case "press": {
         const label = String(p.label).toLowerCase();
         const matches = s.controls
-          .filter((c) => [c.title, c.description, c.value, c.help].some((t) => t?.toLowerCase().includes(label)))
+          .filter((c) => [c.title, c.description, c.value, c.help].some((t) => t?.toLowerCase() === label))
           .map((c) => [c.role, c.title ?? c.description ?? ""].join(" "));
         if (op === "find") return { matches };
         if (!matches.length) throw new Failure(`no control matching "${p.label}"`);
