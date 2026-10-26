@@ -146,11 +146,12 @@ describe("apps and windows", () => {
   });
 
   test("scrollshot scrolls to the top, steps down until the view stops, and stitches", async () => {
+    // One dropped step mid-way is retried; three still steps in a row end it.
     const ctx = fakeContext();
     const out = await run(["scrollshot", "61527", "long.png", "--crop", "0,40,300,700", "--step", "5"], ctx);
     expect(out).toMatchObject({ ok: true, window: 61527, file: "/tmp/long.png", frames: 4, reachedEnd: true, pixels: [600, 2000] });
     const stills = ctx.driver.of("still");
-    expect(stills).toHaveLength(5);
+    expect(stills).toHaveLength(8);
     expect(stills.every((s) => s.max === 0)).toBe(true);
     const stitches = ctx.driver.of("stitch");
     // Window is 1280pt and the fake still 2560px wide: crop and trim arrive in pixels.

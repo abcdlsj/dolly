@@ -102,7 +102,7 @@ export const scrollshot = verb({
   name: "scrollshot",
   summary: "scroll one view top to bottom and stitch it into one tall PNG",
   usage:
-    "dolly scrollshot <windowID> <out.png> --crop x,y,w,h [--at x,y] [--step 6] [--max 60] [--trim 24] [--settle 0.35] [--chrome] [--keep] [--guard app]",
+    "dolly scrollshot <windowID> <out.png> --crop x,y,w,h [--at x,y] [--step 6] [--max 60] [--retries 3] [--trim 24] [--settle 0.35] [--chrome] [--keep] [--guard app]",
   parse(args) {
     const crop = parseRect(args.string("crop"));
     if (!crop) throw new UsageError("--crop wants the scrolling view as x,y,width,height in window points");
@@ -115,6 +115,7 @@ export const scrollshot = verb({
       at: args.point("at"),
       step: Math.max(Math.trunc(args.number("step", 6)), 1),
       max: Math.max(Math.trunc(args.number("max", 60)), 1),
+      retries: Math.max(Math.trunc(args.number("retries", 3)), 1),
       trim: [trim[0] ?? 24, trim[1] ?? trim[0] ?? 24] as [number, number],
       settle: args.number("settle", 0.35),
       chrome: args.flag("chrome"),
@@ -159,16 +160,25 @@ export const scrollshot = verb({
 
     await shoot();
     let reachedEnd = false;
+    // A view can drop a wheel event that lands just as the pointer enters
+    // it, so one step that does not move is not yet the end: only `retries`
+    // still steps in a row are.
+    let still = 0;
     while (files.length < p.max) {
       await pointTo(at);
+      await ctx.sleep(80);
       await ctx.driver.call("input", { steps: scrollSteps(-p.step, 0, "line", 1, 0) });
       await pointTo(park);
       await settle();
       await shoot();
       const { offsets } = await ctx.driver.call("stitch", { files: files.slice(-2), crop, trim: trim() });
-      if ((offsets[1] ?? 0) === 0) {
+      if ((offsets[1] ?? 0) > 0) {
+        still = 0;
+        continue;
+      }
+      rmSync(files.pop()!, { force: true });
+      if (++still >= p.retries) {
         reachedEnd = true;
-        rmSync(files.pop()!, { force: true });
         break;
       }
     }

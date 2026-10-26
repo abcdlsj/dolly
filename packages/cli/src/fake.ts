@@ -96,8 +96,9 @@ export class FakeDriver implements Driver {
       case "still":
         return { pixels: p.max ? [Math.min(p.max, 2560), Math.round((Math.min(p.max, 2560) * 1600) / 2560)] : [2560, 1600] };
       case "stitch": {
-        // The fake view scrolls three times, then stops.
-        const offsets = p.files.map((_: string, i: number) => (i === 0 ? 0 : this.scrolls < 3 ? 200 : 0));
+        // The fake view drops its second scroll, moves three times, then stops.
+        const moved = this.scrolls !== 1 && this.scrolls < 4;
+        const offsets = p.files.map((_: string, i: number) => (i === 0 ? 0 : moved ? 200 : 0));
         if (!p.out) this.scrolls++;
         return { offsets, costs: offsets.map(() => 0), ...(p.out ? { pixels: [600, 2000], used: p.files.length } : {}) };
       }
