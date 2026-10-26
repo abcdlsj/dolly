@@ -173,7 +173,8 @@ packages/cli        the `dolly` command, one file per verb group in src/verbs/, 
                     `@dolly/cli/client` to call the same verbs from TypeScript
 drivers/macos       dolly-driver (Swift): plays input timelines, reads AX, lists and
                     captures windows, launches apps, and hosts the launchd service
-apps/studio         the desktop app (Tauri + TypeScript)
+apps/studio         the desktop app: a Go shell (Wails v3) with a React frontend,
+                    embedding the frontend and calling `dolly` for everything it films
 site/               the onboarding page; site/js/camera.js is built from the core
 ```
 
@@ -189,6 +190,8 @@ $ bun test                       # core, golden plans, every verb on a fake driv
 $ bun run typecheck
 $ bun packages/cli/src/main.ts camera --shot shot.json --explain
 $ swift build --package-path drivers/macos      # on a Mac
+$ cd apps/studio && bun run build && go run .   # the desktop app, unbundled
+$ cd apps/studio && bun run build:mac           # or Dolly.app, signed
 ```
 
 `packages/core/test/fixtures/golden.json` was recorded from the Python

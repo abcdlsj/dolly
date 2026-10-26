@@ -258,6 +258,9 @@ textarea.underline:focus { border-bottom-color: var(--ink); }
 
 .settings { position: relative; height: 100%; display: flex; background: var(--paper); font-size: 13px; }
 .settings .drag { position: absolute; left: 0; right: 0; top: 0; height: 40px; }
+
+/* The shell drags a window by this custom property, not by a data attribute. */
+[data-drag-region] { --wails-draggable: drag; }
 .settings nav { width: 150px; flex: none; padding: 56px 0 0 24px; display: flex; flex-direction: column; gap: 2px; }
 .settings nav button { height: 28px; padding: 0; border: 0; background: transparent; text-align: left; color: var(--mute); }
 .settings nav button[aria-current="page"] { color: var(--ink); font-weight: 600; }

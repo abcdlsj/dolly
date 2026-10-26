@@ -46,7 +46,7 @@ export function Onboarding() {
 
   return (
     <div className="welcome-ground">
-      <div className="welcome" role="dialog" aria-modal="true" aria-labelledby="welcome-title" data-tauri-drag-region>
+      <div className="welcome" role="dialog" aria-modal="true" aria-labelledby="welcome-title" data-drag-region>
         <div className="welcome-head">
           <img src="/icon.svg" alt="" width={72} height={72} />
           <h1 id="welcome-title">Welcome to Dolly</h1>

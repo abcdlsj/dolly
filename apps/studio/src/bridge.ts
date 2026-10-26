@@ -1,6 +1,6 @@
 // Keeps every Studio window on one state. The main window publishes each
 // snapshot and runs the actions other windows send; those windows render the
-// snapshot they last received. In Tauri this rides on app events; in a
+// snapshot they last received. In the app this rides on Wails events; in a
 // browser (vite dev) on a BroadcastChannel.
 
 import type { NewFilm, Snapshot } from "./model/store.ts";

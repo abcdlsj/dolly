@@ -8,7 +8,7 @@ import { realClock, type Director } from "./agent/director.ts";
 import { PiDirector } from "./agent/pi.ts";
 import { SimulatedDirector } from "./agent/simulated.ts";
 import { liveShot, shotNumber, Store, type Snapshot } from "./model/store.ts";
-import { channel, dolly, hidePanel, isTauri, notify, openPanel, route, setTrayTitle, spawnPi } from "./platform.ts";
+import { channel, dolly, hidePanel, isNative, notify, openPanel, quit, route, setTrayTitle, spawnPi } from "./platform.ts";
 import { Film } from "./screens/Film.tsx";
 import { Library } from "./screens/Library.tsx";
 import { NewFilm } from "./screens/NewFilm.tsx";
@@ -48,7 +48,7 @@ function save(store: Store): () => void {
 /** Simulated runs until the app has a key; with one, pi does the real work. Adding a key switches over. */
 function direct(store: Store): void {
   const demo = new URLSearchParams(location.search).has("demo");
-  const wantsPi = () => isTauri && !demo && !!store.settings.keyHint;
+  const wantsPi = () => isNative && !demo && !!store.settings.keyHint;
   let usingPi = wantsPi();
   const make = (): Director => (usingPi ? new PiDirector(spawnPi, realClock, () => dolly.run(["release"]).then(() => {})) : new SimulatedDirector());
   let stop = make().attach(store);
@@ -126,7 +126,7 @@ function App({ inbox }: { inbox: (listener: (to: Destination) => void) => () => 
 
   // While another app is in front, the floating panel keeps the film in reach.
   useEffect(() => {
-    if (!isTauri) return;
+    if (!isNative) return;
     const blur = () => {
       if (activeFilm(filmsRef.current)) openPanel("glance");
     };
@@ -178,7 +178,6 @@ function start(): void {
 
   const remote = new RemoteStudio(bridge);
   const open = (to: Destination) => remote.open(to);
-  const quit = () => void import("@tauri-apps/api/core").then(({ invoke }) => invoke("quit"));
   const page = panel === "settings" ? <Settings /> : panel === "glance" ? <Glance open={open} /> : <Tray open={open} quit={quit} />;
   root.render(<StrictMode><StudioProvider studio={remote}>{page}</StudioProvider></StrictMode>);
 }

@@ -79,7 +79,7 @@ function Making({ film, inspector, onInspector, onBack }: PageProps) {
 
   return (
     <div className="window ground">
-      <header className="toolbar inset" data-tauri-drag-region>
+      <header className="toolbar inset" data-drag-region>
         <button type="button" className="icon-btn" aria-label="Back to Films" onClick={onBack}><Back /></button>
         <div className="stack side" style={{ width: 300 }}>
           <b>{filmTitle(film)}</b>
@@ -221,7 +221,7 @@ function Ready({ film, inspector, onInspector, onBack }: PageProps) {
 
   return (
     <div className="window ground">
-      <header className="toolbar inset" data-tauri-drag-region>
+      <header className="toolbar inset" data-drag-region>
         <button type="button" className="icon-btn" aria-label="Back to Films" onClick={onBack}><Back /></button>
         <div className="stack side" style={{ width: 300 }}>
           <b>{filmTitle(film)}</b>

@@ -6,8 +6,7 @@ import { at, frameRect, transform, viewOf } from "../preview/camera.ts";
 import { liveShot, secondsLeft, shotNumber } from "../model/store.ts";
 import type { Film, Question, Shot } from "../model/types.ts";
 import { Countdown, Cursor } from "./icons.tsx";
-import { convertFileSrc } from "@tauri-apps/api/core";
-import { isTauri } from "../platform.ts";
+import { fileSrc } from "../platform.ts";
 
 /** Seconds since mount, looping every `period` seconds; paused when `running` is false. */
 export function useLoop(period: number, running = true): number {
@@ -28,8 +27,8 @@ export function useLoop(period: number, running = true): number {
 }
 
 function frameSrc(path: string): string {
-  // Tauri serves local files through its asset protocol.
-  return isTauri ? convertFileSrc(path) : path;
+  // The shell streams local files; a browser tab loads them straight.
+  return fileSrc(path);
 }
 
 /** A stand-in for the app until there is a snapshot or footage to show. */

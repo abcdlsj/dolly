@@ -1,3 +1,4 @@
-dist/
-src-tauri/target/
-src-tauri/gen/
+# The frontend is embedded in the Go binary, but `go:embed` needs the folder to
+# exist before the first `bun run build`.
+dist/*
+!dist/.gitkeep

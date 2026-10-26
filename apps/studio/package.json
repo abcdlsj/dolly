@@ -6,19 +6,16 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:mac": "bash scripts/build.sh",
-    "tauri": "tauri"
+    "app": "bun run build && go run .",
+    "build:mac": "bash scripts/bundle.sh"
   },
   "dependencies": {
+    "@dolly/cli": "workspace:*",
     "@dolly/core": "workspace:*",
-    "@tauri-apps/api": "2.9.1",
-    "@tauri-apps/plugin-notification": "2.3.3",
     "react": "18.3.1",
-    "react-dom": "18.3.1",
-    "@dolly/cli": "workspace:*"
+    "react-dom": "18.3.1"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "2.9.2",
     "@types/react": "18.3.31",
     "@types/react-dom": "18.3.7",
     "@vitejs/plugin-react": "4.7.0",

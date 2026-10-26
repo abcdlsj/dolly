@@ -3,7 +3,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ASK_LEVELS, FORMATS, LENGTHS, type AppRef, type AskLevel, type FormatId, type Length } from "../model/types.ts";
-import { chooseApp, installedApps, isTauri, type InstalledApp } from "../platform.ts";
+import { chooseApp, installedApps, isNative, type InstalledApp } from "../platform.ts";
 import { useSnapshot, useStudio } from "../state.tsx";
 import { Menu, type MenuItem } from "../ui/menu.tsx";
 
@@ -61,7 +61,7 @@ export function NewFilm({ onClose, onMade }: { onClose: () => void; onMade: (fil
 
   const appItems: MenuItem[] = [
     ...apps.map((item) => ({ label: item.name, run: () => setApp(toRef(item)) })),
-    ...(isTauri ? ["separator" as const, { label: "Other…", run: () => void chooseApp().then((picked) => picked && setApp(toRef(picked))) }] : []),
+    ...(isNative ? ["separator" as const, { label: "Other…", run: () => void chooseApp().then((picked) => picked && setApp(toRef(picked))) }] : []),
   ];
 
   const minutes = { 15: 12, 30: 20, 60: 35 }[length];

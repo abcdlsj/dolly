@@ -1,7 +1,7 @@
-// Everything that differs between the Tauri app and a plain browser tab
-// (vite dev, tests). The Rust side owns processes and secrets, so the API key
-// never reaches the web view: it is read from the system keychain and handed
-// to pi as an environment variable.
+// Everything that differs between the Wails shell and a plain browser tab
+// (vite dev, tests). The Go side owns processes and secrets, so the API key
+// never reaches the web view: it is read from the login keychain and handed to
+// pi as an environment variable.
 
 import { broadcastChannel, type Channel, type Message } from "./bridge.ts";
 import type { PiProcess, Spawn } from "./agent/pi.ts";
@@ -10,22 +10,49 @@ import { FakeClient, trusted, type DollyClient, type Output } from "./system/cli
 
 export type Panel = "main" | "settings" | "glance" | "tray";
 
-export const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+/** True inside Dolly.app; Wails serves the page over its own scheme. */
+export const isNative = typeof window !== "undefined" && location.protocol === "wails:";
 export const isMac = typeof navigator !== "undefined" && /Mac/.test(navigator.platform);
 
-async function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<T>(command, args);
+type Runtime = {
+  Call: { ByName(method: string, ...args: unknown[]): Promise<unknown> };
+  Events: {
+    On(name: string, callback: (event: { data: unknown }) => void): () => void;
+    Emit(name: string, data?: unknown): void;
+  };
+};
+
+const RUNTIME = "/wails/runtime.js";
+let runtime: Promise<Runtime> | undefined;
+
+/** Wails' JavaScript runtime, pulled in only in the app. */
+function shell(): Promise<Runtime> {
+  runtime ??= import(/* @vite-ignore */ RUNTIME) as Promise<Runtime>;
+  return runtime;
+}
+
+/** Studio is the single Go service the web view may call: `package.Type.Method`. */
+const SERVICE = "main.Studio.Invoke";
+
+/** Runs one command. The Go side dispatches on the name and reads `args`. */
+export async function invoke<T>(command: string, args: Record<string, unknown> = {}): Promise<T> {
+  const { Call } = await shell();
+  return Call.ByName(SERVICE, command, args) as Promise<T>;
+}
+
+async function on<T>(name: string, listener: (payload: T) => void): Promise<() => void> {
+  const { Events } = await shell();
+  return Events.On(name, (event) => listener(event.data as T));
 }
 
 export function channel(): Channel {
-  if (!isTauri) return broadcastChannel();
+  if (!isNative) return broadcastChannel();
   const listeners = new Set<(message: Message) => void>();
-  void import("@tauri-apps/api/event").then(({ listen }) => listen<Message>("studio", (event) => {
-    for (const listener of listeners) listener(event.payload);
+  void shell().then(({ Events }) => Events.On("studio", (event) => {
+    for (const listener of listeners) listener(event.data as Message);
   }));
   return {
-    post: (message) => void import("@tauri-apps/api/event").then(({ emit }) => emit("studio", message)),
+    post: (message) => void shell().then(({ Events }) => Events.Emit("studio", message)),
     listen(listener) {
       listeners.add(listener);
       return () => listeners.delete(listener);
@@ -34,42 +61,43 @@ export function channel(): Channel {
 }
 
 export function openPanel(panel: Panel): void {
-  if (isTauri) void invoke("show_window", { label: panel });
+  if (isNative) void invoke("show_window", { label: panel });
   else if (panel === "main") window.open("#/", "dolly-main");
   else window.open(`#/${panel}`, `dolly-${panel}`, panel === "settings" ? "width=640,height=640" : "width=360,height=520");
 }
 
 export function hidePanel(panel: Panel): void {
-  if (isTauri) void invoke("hide_window", { label: panel });
+  if (isNative) void invoke("hide_window", { label: panel });
 }
 
 export function closePanel(): void {
-  if (isTauri) void import("@tauri-apps/api/window").then(({ getCurrentWindow }) => getCurrentWindow().hide());
+  if (isNative) void invoke("hide_window", { label: route() });
   else window.close();
 }
 
+export function quit(): void {
+  if (isNative) void invoke("quit");
+}
+
 export async function notify(title: string, body: string): Promise<void> {
-  if (isTauri) {
-    const notification = await import("@tauri-apps/plugin-notification");
-    if (!(await notification.isPermissionGranted()) && (await notification.requestPermission()) !== "granted") return;
-    notification.sendNotification({ title, body });
-  } else if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+  if (isNative) return invoke("notify", { title, body });
+  if (typeof Notification !== "undefined" && Notification.permission === "granted") {
     new Notification(title, { body });
   }
 }
 
 export async function saveKey(provider: string, key: string): Promise<string> {
-  if (!isTauri) return key.slice(-4);
+  if (!isNative) return key.slice(-4);
   return invoke<string>("secret_set", { provider, key });
 }
 
 export async function testConnection(provider: string, endpoint = ""): Promise<{ ok: boolean; ms: number; error?: string }> {
-  if (!isTauri) return { ok: true, ms: 0 };
+  if (!isNative) return { ok: true, ms: 0 };
   return invoke("provider_check", { provider, endpoint });
 }
 
-/** `dolly` itself: the bundled binary through the Rust side, or a fake in a browser tab. */
-export const dolly: DollyClient = isTauri ? { run: (argv) => invoke<Output>("dolly", { argv }) } : new FakeClient();
+/** `dolly` itself: the bundled binary through the Go side, or a fake in a browser tab. */
+export const dolly: DollyClient = isNative ? { run: (argv) => invoke<Output>("dolly", { argv }) } : new FakeClient();
 
 export interface Permissions {
   screen: boolean;
@@ -77,14 +105,14 @@ export interface Permissions {
 }
 
 export async function permissions(): Promise<Permissions> {
-  if (!isTauri) return { screen: true, accessibility: true };
+  if (!isNative) return { screen: true, accessibility: true };
   const [screen, accessibility] = await Promise.all([invoke<boolean>("screen_access"), trusted(dolly).catch(() => false)]);
   return { screen, accessibility };
 }
 
 /** Asks macOS for the permission, then opens its pane in System Settings. */
 export function askPermission(kind: keyof Permissions): void {
-  if (!isTauri) return;
+  if (!isNative) return;
   if (kind === "accessibility") void trusted(dolly, true).catch(() => false);
   void invoke("open_permission_settings", { kind });
 }
@@ -102,31 +130,35 @@ const SAMPLE_APPS: InstalledApp[] = [
 ];
 
 export async function installedApps(): Promise<InstalledApp[]> {
-  if (!isTauri) return SAMPLE_APPS;
+  if (!isNative) return SAMPLE_APPS;
   return invoke<InstalledApp[]>("installed_apps");
 }
 
 /** Shows a file in Finder (or the system file manager). */
 export function reveal(path: string): void {
-  if (isTauri) void invoke("reveal", { path });
+  if (isNative) void invoke("reveal", { path });
 }
 
 /** The short status next to the menu bar icon, like “3/5”; empty hides it. */
 export function setTrayTitle(title: string): void {
-  if (isTauri) void invoke("tray_title", { title });
+  if (isNative) void invoke("tray_title", { title });
 }
 
 export async function chooseApp(): Promise<InstalledApp | null> {
-  if (!isTauri) return null;
+  if (!isNative) return null;
   return invoke("choose_app");
 }
 
-/** Spawns `pi --mode rpc` through the Rust side, one process per film. */
+/** A local file the web view may show: the Go asset server streams it, ranges included. */
+export function fileSrc(path: string): string {
+  return isNative ? `/_dolly/file?path=${encodeURIComponent(path)}` : path;
+}
+
+/** Spawns `pi --mode rpc` through the Go side, one process per film. */
 export const spawnPi: Spawn = async (film, settings) => {
-  const { listen } = await import("@tauri-apps/api/event");
   const paths = await invoke<{ skill: string; extension: string; sessions: string }>("agent_paths");
   // An OpenAI-compatible address becomes pi's own `dolly` provider, described
-  // in a models.json the Rust side writes; the named providers are pi's.
+  // in a models.json the Go side writes; the named providers are pi's.
   const custom = settings.provider === "custom";
   const endpoint = custom ? settings.endpoint.trim() : "";
   if (custom && !endpoint) throw new Error("Set the provider's address in Settings.");
@@ -137,20 +169,20 @@ export const spawnPi: Spawn = async (film, settings) => {
     provider: custom ? "dolly" : settings.provider,
     model: settings.model,
   });
-  await invoke("pi_start", { id: film.id, args, provider: settings.provider, endpoint, model: settings.model });
   const lines = new Set<(line: string) => void>();
   const exits = new Set<(code: number | null, stderr: string) => void>();
-  const stopLines = await listen<{ id: string; line: string }>("pi-line", (event) => {
-    if (event.payload.id === film.id) for (const listener of lines) listener(event.payload.line);
+  const stopLines = await on<{ id: string; line: string }>("pi-line", (payload) => {
+    if (payload.id === film.id) for (const listener of lines) listener(payload.line);
   });
-  const stopExit = await listen<{ id: string; code: number | null; stderr: string }>("pi-exit", (event) => {
-    if (event.payload.id !== film.id) return;
+  const stopExit = await on<{ id: string; code: number | null; stderr: string }>("pi-exit", (payload) => {
+    if (payload.id !== film.id) return;
     stopLines();
     stopExit();
-    for (const listener of exits) listener(event.payload.code, event.payload.stderr ?? "");
+    for (const listener of exits) listener(payload.code, payload.stderr ?? "");
   });
+  await invoke("pi_start", { id: film.id, args, provider: settings.provider, endpoint, model: settings.model });
   const process: PiProcess = {
-    // The Rust side ends each record with its own "\n".
+    // The Go side ends each record with its own "\n".
     send: (line) => void invoke("pi_send", { id: film.id, line: line.replace(/\n$/, "") }),
     onLine: (listener) => lines.add(listener),
     onExit: (listener) => exits.add(listener),

@@ -21,7 +21,7 @@ export function Settings({ initial = "AI" }: { initial?: Section }) {
   const [section, setSection] = useState<Section>(initial);
   return (
     <div className="settings">
-      <div className="drag" data-tauri-drag-region />
+      <div className="drag" data-drag-region />
       <nav aria-label="Settings sections">
         {SECTIONS.map((name) => (
           <button key={name} type="button" aria-current={section === name ? "page" : undefined} onClick={() => setSection(name)}>{name}</button>

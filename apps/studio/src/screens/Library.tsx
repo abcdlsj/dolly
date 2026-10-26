@@ -43,7 +43,7 @@ export function Library({ onOpen, onNew }: { onOpen: (film: Film) => void; onNew
 
   return (
     <div className="window">
-      <header className="toolbar inset" data-tauri-drag-region>
+      <header className="toolbar inset" data-drag-region>
         <span className="title" style={{ width: 120 }}>Films</span>
         <span className="spacer" />
         {films.length > 0 && (

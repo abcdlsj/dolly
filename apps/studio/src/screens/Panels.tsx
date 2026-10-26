@@ -63,7 +63,7 @@ export function Glance({ open }: { open: (to: Destination) => void }) {
   const recording = !!live && !film.paused && !film.heldByYou;
   return (
     <div className="panel glance" role="dialog" aria-label="Dolly">
-      <div className="glance-head" data-tauri-drag-region>
+      <div className="glance-head" data-drag-region>
         <Thumb film={film} />
         <span style={{ flex: "1 1 auto", display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
           <span style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
