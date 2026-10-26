@@ -32,11 +32,19 @@ function load(store: Store): void {
 }
 
 // The key lives in the keychain, which outlives the web view: a window that
-// starts with empty storage must not go on rehearsing while a key is right there.
-async function adoptKeyHint(store: Store): Promise<void> {
-  if (store.settings.keyHint) return;
-  const hint = await keyHint(store.settings.provider).catch(() => "");
-  if (hint) store.updateSettings({ keyHint: hint });
+// starts with empty storage must not go on rehearsing while a key is right
+// there. Switching provider re-asks, since each one has its own entry.
+function adoptKeyHint(store: Store): void {
+  let asked = "";
+  const adopt = async () => {
+    const { provider, keyHint: hint } = store.settings;
+    if (hint || provider === asked) return;
+    asked = provider;
+    const found = await keyHint(provider).catch(() => "");
+    if (found) store.updateSettings({ keyHint: found });
+  };
+  store.subscribe(() => void adopt());
+  void adopt();
 }
 
 function save(store: Store): () => void {

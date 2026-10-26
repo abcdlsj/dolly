@@ -22,6 +22,11 @@ func keyVariable(provider string) string {
 	}
 }
 
+// shortestKey is the least that can be a key. An early build could store
+// something that is not one; treating that as a key hides the missing key
+// behind a run that rehearses instead of filming.
+const shortestKey = 8
+
 // secret reads a provider's key from the login keychain. `security` gets it on
 // stdout, so the key never appears in an argument list.
 func secret(provider string) (string, bool) {
@@ -29,8 +34,11 @@ func secret(provider string) (string, bool) {
 	if err != nil {
 		return "", false
 	}
-	key := strings.TrimSuffix(string(out), "\n")
-	return key, key != ""
+	key := strings.TrimSpace(string(out))
+	if len(key) < shortestKey {
+		return "", false
+	}
+	return key, true
 }
 
 // secretSet stores the key and returns its last four characters for display.
