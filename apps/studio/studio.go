@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/services/notifications"
@@ -15,10 +16,16 @@ type Studio struct {
 	notify *notifications.NotificationService
 	tray   *application.SystemTray
 	agents *agents
+
+	// calls folds the dolly calls windows make at the same time; runDolly is
+	// the process behind them, replaceable in tests.
+	mu       sync.Mutex
+	calls    map[string]*dollyCall
+	runDolly func([]string) (any, error)
 }
 
 func newStudio() *Studio {
-	return &Studio{agents: newAgents()}
+	return &Studio{agents: newAgents(), calls: map[string]*dollyCall{}, runDolly: runDolly}
 }
 
 func (s *Studio) attach(app *application.App, notify *notifications.NotificationService) {
@@ -52,7 +59,7 @@ func (s *Studio) Invoke(command string, args map[string]any) (any, error) {
 	case "provider_check":
 		return providerCheck(text(args, "provider"), text(args, "endpoint")), nil
 	case "dolly":
-		return runDolly(list(args, "argv"))
+		return s.dolly(list(args, "argv"))
 	case "screen_access":
 		return screenAccess(), nil
 	case "open_permission_settings":

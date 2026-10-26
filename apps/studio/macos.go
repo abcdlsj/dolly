@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -21,7 +22,10 @@ func runDolly(argv []string) (any, error) {
 	if binary == "" {
 		return nil, errors.New("dolly is missing from the app bundle")
 	}
-	cmd := exec.Command(binary, argv...)
+	// A dolly that hangs must end, or every later call waits behind it.
+	ctx, cancel := context.WithTimeout(context.Background(), dollyTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, binary, argv...)
 	cmd.Env = append(os.Environ(), "PATH="+path)
 	out, err := cmd.Output()
 	if len(out) == 0 {

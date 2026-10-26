@@ -12,14 +12,18 @@ export function Onboarding() {
   const [editing, setEditing] = useState(false);
   const [key, setKey] = useState("");
 
+  // Each poll runs the bundled `dolly trust`, so it is paced: once the window
+  // is out of sight, a grant cannot change, and asking on a timer spends a
+  // process for nothing.
   useEffect(() => {
     let stop = false;
     const poll = async () => {
+      if (document.hidden) return;
       const now = await permissions().catch(() => null);
       if (!stop && now) setAllowed(now);
     };
     void poll();
-    const timer = setInterval(() => void poll(), 1500);
+    const timer = setInterval(() => void poll(), 3000);
     return () => {
       stop = true;
       clearInterval(timer);
