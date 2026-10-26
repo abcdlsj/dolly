@@ -21,12 +21,18 @@ swift build -c release --package-path "$root/drivers/macos" >/dev/null
 echo "shell"
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources/skills" "$app/Contents/Resources/agent"
-(cd "$here" && go build -trimpath -ldflags "-s -w" -o "$app/Contents/MacOS/Dolly" .)
+(cd "$here" && go build -trimpath -ldflags "-s -w" -o "$app/Contents/MacOS/dolly-studio" .)
 
 cp "$root/.build/dolly" "$app/Contents/MacOS/dolly"
 cp "$root/drivers/macos/.build/release/dolly-driver" "$app/Contents/MacOS/dolly-driver"
 cp -R "$root/skills/dolly" "$app/Contents/Resources/skills/dolly"
 cp "$here/agent/studio-extension.ts" "$app/Contents/Resources/agent/studio-extension.ts"
+
+# The filesystem ignores case: `Dolly` and `dolly` are one name, so the shell is
+# `dolly-studio` and the app is still called Dolly by its Info.plist.
+for binary in dolly-studio dolly dolly-driver; do
+  test -x "$app/Contents/MacOS/$binary" || { echo "missing $binary in the bundle" >&2; exit 1; }
+done
 cp "$here/icons/icon.icns" "$app/Contents/Resources/icon.icns"
 
 cat > "$app/Contents/Info.plist" <<'PLIST'
@@ -34,7 +40,7 @@ cat > "$app/Contents/Info.plist" <<'PLIST'
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>CFBundleExecutable</key><string>Dolly</string>
+  <key>CFBundleExecutable</key><string>dolly-studio</string>
   <key>CFBundleIconFile</key><string>icon</string>
   <key>CFBundleIdentifier</key><string>app.dolly.studio</string>
   <key>CFBundleName</key><string>Dolly</string>

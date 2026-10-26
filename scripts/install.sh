@@ -12,6 +12,14 @@ app="$target/Dolly.app"
 swift build -c release --package-path "$root/drivers/macos"
 (cd "$root" && bun install --frozen-lockfile >/dev/null && bun run build:cli >/dev/null)
 
+# Studio ships this same path as a full app; replacing it with the headless
+# container would delete the shell the person runs.
+if [ -f "$app/Contents/Info.plist" ] \
+  && [ "$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$app/Contents/Info.plist" 2>/dev/null)" = "app.dolly.studio" ]; then
+  echo "Dolly.app at $app is Studio; build it with: (cd apps/studio && bun run build:mac)" >&2
+  exit 1
+fi
+
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp "$root/drivers/macos/.build/release/dolly-driver" "$app/Contents/MacOS/dolly-driver"
