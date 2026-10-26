@@ -176,6 +176,23 @@ export async function chooseApp(): Promise<InstalledApp | null> {
   return invoke("choose_app");
 }
 
+/** Where the live view of the app being filmed writes its frames. */
+export interface LiveFrame {
+  pid: number;
+  window: number;
+  /** One PNG, overwritten by the next capture. */
+  path: string;
+}
+
+export async function startLive(app: string): Promise<LiveFrame | null> {
+  if (!isNative) return null;
+  return invoke<LiveFrame | null>("live_start", { app }).catch(() => null);
+}
+
+export async function stopLive(): Promise<void> {
+  if (isNative) await invoke("live_stop").catch(() => {});
+}
+
 /** A local file the web view may show: the Go asset server streams it, ranges included. */
 export function fileSrc(path: string): string {
   return isNative ? `/_dolly/file?path=${encodeURIComponent(path)}` : path;

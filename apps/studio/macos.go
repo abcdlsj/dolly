@@ -154,6 +154,23 @@ func chooseApp() *installedApp {
 	return &app
 }
 
+// bundleExecutable is the name in Contents/MacOS that macOS launches.
+func bundleExecutable(app string) (string, bool) {
+	out, err := exec.Command("plutil", "-convert", "json", "-o", "-", filepath.Join(app, "Contents", "Info.plist")).Output()
+	if err != nil {
+		return "", false
+	}
+	var info map[string]any
+	if err := json.Unmarshal(out, &info); err != nil {
+		return "", false
+	}
+	name, _ := info["CFBundleExecutable"].(string)
+	if name == "" {
+		return "", false
+	}
+	return name, true
+}
+
 // readApp names an .app the way its Info.plist does.
 func readApp(path string) (installedApp, bool) {
 	out, err := exec.Command("plutil", "-convert", "json", "-o", "-", filepath.Join(path, "Contents", "Info.plist")).Output()

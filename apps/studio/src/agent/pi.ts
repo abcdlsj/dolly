@@ -164,6 +164,13 @@ export class PiDirector implements Director {
       case "tool_execution_start":
         this.store.patch(filmId, (film) => ({ steps: film.steps + 1 }));
         if (event.toolName === "film") this.applyFilm(filmId, event.args as FilmParams);
+        else if (event.toolName === "bash") {
+          // What the agent asked the shell for is the closest thing to "what is
+          // dolly doing right now": `dolly hover 640,420 --guard 4711`.
+          const command = String((event.args as { command?: unknown }).command ?? "").trim();
+          const line = command.split("\n").map((part) => part.trim()).find(Boolean) ?? "";
+          if (line) this.store.patch(filmId, { doing: line.length > 140 ? `${line.slice(0, 137)}…` : line });
+        }
         else if (event.toolName === "ask") {
           const ask = event.args as unknown as AskParams;
           session.pendingAsks.set(ask.question, ask);

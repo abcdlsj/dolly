@@ -10,7 +10,7 @@ import { FORMATS, STAGE_LABEL, STAGES, type Film as FilmData, type FormatId, typ
 import { reveal, simulates } from "../platform.ts";
 import { useNow, useSnapshot, useStudio } from "../state.tsx";
 import { Back, Inspector as InspectorIcon, PauseGlyph, Play, StepChevron } from "../ui/icons.tsx";
-import { clock, Filmstrip, Footage, QuestionLine } from "../ui/film.tsx";
+import { clock, Filmstrip, Footage, QuestionLine, useLive } from "../ui/film.tsx";
 import { Menu, type MenuItem } from "../ui/menu.tsx";
 import { filmTitle, money, MOVE_NAME, sentences, shapes } from "../ui/words.ts";
 
@@ -59,6 +59,9 @@ function useColumn(): [React.RefObject<HTMLDivElement>, number] {
 
 function Making({ film, inspector, onInspector, onBack }: PageProps) {
   const { settings } = useSnapshot();
+  // The app itself, not a drawing of it: Dolly films what is on screen, so the
+  // person should be able to watch the same window.
+  const mirror = useLive(film.app.path, film.stage !== "ready");
   const studio = useStudio();
   const now = useNow(250);
   const [column, width] = useColumn();
@@ -114,7 +117,7 @@ function Making({ film, inspector, onInspector, onBack }: PageProps) {
       <div className="body">
         <div className="column" ref={column}>
           <div style={{ width, display: "flex", flexDirection: "column" }}>
-            <Footage film={film} width={width} mode="live" rec />
+            <Footage film={film} width={width} mode="live" rec {...(mirror ? { live: mirror } : {})} />
             <div className="shot-line">
               {!live && asked ? (
                 <>

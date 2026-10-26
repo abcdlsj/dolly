@@ -6,7 +6,33 @@ import { at, frameRect, transform, viewOf } from "../preview/camera.ts";
 import { liveShot, secondsLeft, shotNumber } from "../model/store.ts";
 import type { Film, Question, Shot } from "../model/types.ts";
 import { Countdown, Cursor } from "./icons.tsx";
-import { fileSrc } from "../platform.ts";
+import { fileSrc, startLive, stopLive } from "../platform.ts";
+
+/**
+ * The app as it is now: the shell captures the window every 400 ms into one
+ * PNG, and this reloads it. Empty when there is nothing to show.
+ */
+export function useLive(app: string, running: boolean): string {
+  const [src, setSrc] = useState("");
+  useEffect(() => {
+    setSrc("");
+    if (!running) return;
+    let stop = false;
+    let timer: ReturnType<typeof setInterval> | undefined;
+    void startLive(app).then((frame) => {
+      if (!frame || stop) return;
+      const tick = () => setSrc(`${fileSrc(frame.path)}&t=${Date.now()}`);
+      tick();
+      timer = setInterval(tick, 500);
+    });
+    return () => {
+      stop = true;
+      clearInterval(timer);
+      void stopLive();
+    };
+  }, [app, running]);
+  return src;
+}
 
 /** Seconds since mount, looping every `period` seconds; paused when `running` is false. */
 export function useLoop(period: number, running = true): number {
@@ -72,9 +98,11 @@ interface FootageProps {
   t?: number;
   caption?: string;
   rec?: boolean;
+  /** The app as it is now; falls back to the last snapshot, then the drawing. */
+  live?: string;
 }
 
-export function Footage({ film, width, height = Math.round((width * 9) / 16), aspect = "16:9", mode, t = 0, caption, rec }: FootageProps) {
+export function Footage({ film, width, height = Math.round((width * 9) / 16), aspect = "16:9", mode, t = 0, caption, rec, live: mirror }: FootageProps) {
   const live = liveShot(film);
   const loop = useLoop(live?.seconds ?? 6, mode === "live" && !!live && !film.paused && !film.heldByYou);
   const style: CSSProperties = { width, height, background: film.app.tint, boxShadow: "0 1px 2px rgba(0,0,0,0.08), 0 8px 30px rgba(0,0,0,0.08)" };
@@ -91,7 +119,13 @@ export function Footage({ film, width, height = Math.round((width * 9) / 16), as
   return (
     <div className="footage" style={style}>
       <div className="stage" style={stage}>
-        {film.frame ? <img className="snap" src={frameSrc(film.frame)} alt="" /> : <AppMock film={film} scale={width / 864} />}
+        {mirror ? (
+          <img className="snap" src={mirror} alt="" />
+        ) : film.frame ? (
+          <img className="snap" src={frameSrc(film.frame)} alt="" />
+        ) : (
+          <AppMock film={film} scale={width / 864} />
+        )}
       </div>
       {corners && (
         <div className="corners" aria-hidden="true" style={{ left: `${corners.left}%`, top: `${corners.top}%`, width: `${corners.width}%`, height: `${corners.height}%` }}>

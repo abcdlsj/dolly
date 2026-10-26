@@ -22,6 +22,7 @@ type Studio struct {
 	mu       sync.Mutex
 	calls    map[string]*dollyCall
 	runDolly func([]string) (any, error)
+	live     *liveView
 }
 
 func newStudio() *Studio {
@@ -71,6 +72,11 @@ func (s *Studio) Invoke(command string, args map[string]any) (any, error) {
 		return installedApps(), nil
 	case "choose_app":
 		return chooseApp(), nil
+	case "live_start":
+		return s.liveStart(text(args, "app"))
+	case "live_stop":
+		s.liveStop()
+		return nil, nil
 	case "reveal":
 		reveal(text(args, "path"))
 		return nil, nil
