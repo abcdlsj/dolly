@@ -5,6 +5,15 @@
 
 import { broadcastChannel, type Channel, type Message } from "./bridge.ts";
 import type { PiProcess, Spawn } from "./agent/pi.ts";
+
+/** What pi has said since the last time the web view looked. */
+interface Batch {
+  lines: { seq: number; line: string }[];
+  after: number;
+  done: boolean;
+  code: number | null;
+  stderr: string;
+}
 import { piArgs } from "./agent/rpc.ts";
 import { FakeClient, trusted, type DollyClient, type Output } from "./system/client.ts";
 
@@ -38,11 +47,6 @@ const SERVICE = "main.Studio.Invoke";
 export async function invoke<T>(command: string, args: Record<string, unknown> = {}): Promise<T> {
   const { Call } = await shell();
   return Call.ByName(SERVICE, command, args) as Promise<T>;
-}
-
-async function on<T>(name: string, listener: (payload: T) => void): Promise<() => void> {
-  const { Events } = await shell();
-  return Events.On(name, (event) => listener(event.data as T));
 }
 
 export function channel(): Channel {
@@ -194,16 +198,25 @@ export const spawnPi: Spawn = async (film, settings) => {
   });
   const lines = new Set<(line: string) => void>();
   const exits = new Set<(code: number | null, stderr: string) => void>();
-  const stopLines = await on<{ id: string; line: string }>("pi-line", (payload) => {
-    if (payload.id === film.id) for (const listener of lines) listener(payload.line);
-  });
-  const stopExit = await on<{ id: string; code: number | null; stderr: string }>("pi-exit", (payload) => {
-    if (payload.id !== film.id) return;
-    stopLines();
-    stopExit();
-    for (const listener of exits) listener(payload.code, payload.stderr ?? "");
-  });
   await invoke("pi_start", { id: film.id, args, provider: settings.provider, endpoint, model: settings.model });
+
+  // What pi says is pulled, not pushed: one lost event would leave a film that
+  // never moves, and a dropped record is cheaper to recover than to notice.
+  void (async () => {
+    let after = 0;
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    for (;;) {
+      const batch = await invoke<Batch>("pi_lines", { id: film.id, after }).catch(() => null);
+      if (!batch) return;
+      after = batch.after;
+      for (const record of batch.lines) for (const listener of lines) listener(record.line);
+      if (batch.done) {
+        for (const listener of exits) listener(batch.code, batch.stderr ?? "");
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+  })();
   const process: PiProcess = {
     // The Go side ends each record with its own "\n".
     send: (line) => void invoke("pi_send", { id: film.id, line: line.replace(/\n$/, "") }),

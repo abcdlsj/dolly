@@ -75,10 +75,11 @@ func (s *Studio) Invoke(command string, args map[string]any) (any, error) {
 		reveal(text(args, "path"))
 		return nil, nil
 	case "pi_start":
-		err := s.agents.start(s.app, text(args, "id"), list(args, "args"), text(args, "provider"), text(args, "endpoint"), text(args, "model"))
-		return nil, err
+		return nil, s.agents.start(text(args, "id"), list(args, "args"), text(args, "provider"), text(args, "endpoint"), text(args, "model"))
 	case "pi_send":
 		return nil, s.agents.send(text(args, "id"), text(args, "line"))
+	case "pi_lines":
+		return s.agents.poll(text(args, "id"), count(args, "after"))
 	case "pi_kill":
 		s.agents.kill(text(args, "id"))
 		return nil, nil
@@ -111,6 +112,15 @@ func (s *Studio) quit() {
 func text(args map[string]any, key string) string {
 	value, _ := args[key].(string)
 	return value
+}
+
+// count reads a JSON number the way the web view sends it.
+func count(args map[string]any, key string) uint64 {
+	value, _ := args[key].(float64)
+	if value < 0 {
+		return 0
+	}
+	return uint64(value)
 }
 
 func list(args map[string]any, key string) []string {

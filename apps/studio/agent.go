@@ -6,14 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
-
-	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 // agents runs one `pi --mode rpc` per film and tells the windows what it says.
@@ -22,7 +21,6 @@ type agents struct {
 	writing sync.Mutex
 	byID    map[string]*agent
 	gen     atomic.Uint64
-	app     *application.App
 }
 
 type agent struct {
@@ -30,25 +28,41 @@ type agent struct {
 	stdin io.WriteCloser
 	// generation tells a restarted film's new agent from the one it replaced.
 	generation uint64
+
+	// What pi has said, kept until the web view asks for it. Records are pulled
+	// rather than pushed: one lost event would leave a film that never moves.
+	mu     sync.Mutex
+	lines  []publishedLine
+	seq    uint64
+	done   bool
+	code   *int
+	stderr string
 }
 
-type lineEvent struct {
-	ID   string `json:"id"`
+// publishedLine is one record from pi, numbered so a reader knows where it is.
+type publishedLine struct {
+	Seq  uint64 `json:"seq"`
 	Line string `json:"line"`
 }
 
-type exitEvent struct {
-	ID     string `json:"id"`
-	Code   *int   `json:"code"`
-	Stderr string `json:"stderr"`
+// maxLines is how much of a film's stream Studio keeps for a slow reader.
+const maxLines = 4000
+
+func (running *agent) publish(line string) {
+	running.mu.Lock()
+	defer running.mu.Unlock()
+	running.seq++
+	running.lines = append(running.lines, publishedLine{Seq: running.seq, Line: line})
+	if len(running.lines) > maxLines {
+		running.lines = running.lines[len(running.lines)-maxLines:]
+	}
 }
 
 func newAgents() *agents {
 	return &agents{byID: map[string]*agent{}}
 }
 
-func (a *agents) start(app *application.App, id string, args []string, provider, endpoint, model string) error {
-	a.app = app
+func (a *agents) start(id string, args []string, provider, endpoint, model string) error {
 	path := searchPath()
 	pi := findOnPath(path, "pi")
 	if pi == "" {
@@ -123,13 +137,15 @@ func (a *agents) start(app *application.App, id string, args []string, provider,
 	a.byID[id] = &agent{cmd: cmd, stdin: stdin, generation: generation}
 	a.mu.Unlock()
 
-	go a.pump(id, generation, cmd, stdout, stderr)
+	running := a.byID[id]
+	log.Printf("pi started: film=%s pid=%d", id, cmd.Process.Pid)
+	go a.pump(id, generation, running, stdout, stderr)
 	return nil
 }
 
-// pump reads pi's two streams: records go to the windows, and whatever it
-// printed on stderr explains a death that happened before its first turn.
-func (a *agents) pump(id string, generation uint64, cmd *exec.Cmd, stdout, stderr io.Reader) {
+// pump reads pi's two streams: records are kept for the web view, and whatever
+// it printed on stderr explains a death that happened before its first turn.
+func (a *agents) pump(id string, generation uint64, running *agent, stdout, stderr io.Reader) {
 	var printed strings.Builder
 	var lock sync.Mutex
 	closed := make(chan struct{})
@@ -155,7 +171,7 @@ func (a *agents) pump(id string, generation uint64, cmd *exec.Cmd, stdout, stder
 	for {
 		line, err := readRecord(reader)
 		if line != "" {
-			a.emit("pi-line", lineEvent{ID: id, Line: line})
+			running.publish(line)
 		}
 		if err != nil {
 			break
@@ -163,30 +179,53 @@ func (a *agents) pump(id string, generation uint64, cmd *exec.Cmd, stdout, stder
 	}
 	<-closed
 
-	// An agent replaced by a restart exits quietly, so the new one keeps its listeners.
+	// An agent replaced by a restart exits quietly, so the new one takes over.
 	a.mu.Lock()
 	current, ok := a.byID[id]
-	running := ok && current.generation == generation
-	if running {
-		delete(a.byID, id)
-	}
+	still := ok && current.generation == generation
 	a.mu.Unlock()
-	if !running {
+	if !still {
 		return
 	}
 
-	_ = cmd.Wait()
+	_ = running.cmd.Wait()
 	lock.Lock()
 	tail := printed.String()
 	lock.Unlock()
-	a.emit("pi-exit", exitEvent{ID: id, Code: exitCode(cmd), Stderr: tail})
+	code := exitCode(running.cmd)
+	log.Printf("pi exited: film=%s code=%v", id, code)
+
+	running.mu.Lock()
+	running.done = true
+	running.code = code
+	running.stderr = tail
+	running.mu.Unlock()
 }
 
-func (a *agents) emit(name string, payload any) {
-	if a.app == nil {
-		return
+// poll hands the web view every record after `after`, plus whether pi is gone.
+func (a *agents) poll(id string, after uint64) (map[string]any, error) {
+	a.mu.Lock()
+	running, ok := a.byID[id]
+	a.mu.Unlock()
+	if !ok {
+		return nil, errors.New("that film has no agent running")
 	}
-	a.app.Event.Emit(name, payload)
+
+	running.mu.Lock()
+	defer running.mu.Unlock()
+	lines := make([]publishedLine, 0, len(running.lines))
+	for _, line := range running.lines {
+		if line.Seq > after {
+			lines = append(lines, line)
+		}
+	}
+	return map[string]any{
+		"lines":  lines,
+		"after":  running.seq,
+		"done":   running.done,
+		"code":   running.code,
+		"stderr": running.stderr,
+	}, nil
 }
 
 func (a *agents) send(id, line string) error {
