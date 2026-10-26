@@ -7,7 +7,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import { duration, timeline } from "../preview/camera.ts";
 import { etaText, liveShot, shotNumber } from "../model/store.ts";
 import { FORMATS, STAGE_LABEL, STAGES, type Film as FilmData, type FormatId, type Shot } from "../model/types.ts";
-import { reveal } from "../platform.ts";
+import { reveal, simulates } from "../platform.ts";
 import { useNow, useSnapshot, useStudio } from "../state.tsx";
 import { Back, Inspector as InspectorIcon, PauseGlyph, Play, StepChevron } from "../ui/icons.tsx";
 import { clock, Filmstrip, Footage, QuestionLine } from "../ui/film.tsx";
@@ -15,7 +15,7 @@ import { Menu, type MenuItem } from "../ui/menu.tsx";
 import { filmTitle, money, MOVE_NAME, sentences, shapes } from "../ui/words.ts";
 
 export function Film({ filmId, onBack }: { filmId: string; onBack: () => void }) {
-  const { films } = useSnapshot();
+  const { films, settings } = useSnapshot();
   const film = films.find((item) => item.id === filmId);
   const [inspector, setInspector] = useState(false);
 
@@ -58,6 +58,7 @@ function useColumn(): [React.RefObject<HTMLDivElement>, number] {
 }
 
 function Making({ film, inspector, onInspector, onBack }: PageProps) {
+  const { settings } = useSnapshot();
   const studio = useStudio();
   const now = useNow(250);
   const [column, width] = useColumn();
@@ -83,7 +84,7 @@ function Making({ film, inspector, onInspector, onBack }: PageProps) {
         <button type="button" className="icon-btn" aria-label="Back to Films" onClick={onBack}><Back /></button>
         <div className="stack side" style={{ width: 300 }}>
           <b>{filmTitle(film)}</b>
-          <span>{film.app.name} · {film.length} s · {shapes(film)}</span>
+          <span>{film.app.name} · {film.length} s · {shapes(film)}{simulates(settings) ? " · demo, nothing was filmed" : ""}</span>
         </div>
         <span className="spacer" />
         <ol className="steps" aria-label="Progress">
@@ -205,6 +206,7 @@ function MessageField({ value, onChange, onSend, placeholder, hint }: { value: s
 }
 
 function Ready({ film, inspector, onInspector, onBack }: PageProps) {
+  const { settings } = useSnapshot();
   const studio = useStudio();
   const [column, width] = useColumn();
   const [message, setMessage] = useState("");

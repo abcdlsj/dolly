@@ -56,6 +56,8 @@ func (s *Studio) Invoke(command string, args map[string]any) (any, error) {
 		return nil, nil
 	case "secret_set":
 		return secretSet(text(args, "provider"), text(args, "key"))
+	case "secret_hint":
+		return secretHint(text(args, "provider")), nil
 	case "provider_check":
 		return providerCheck(text(args, "provider"), text(args, "endpoint")), nil
 	case "dolly":

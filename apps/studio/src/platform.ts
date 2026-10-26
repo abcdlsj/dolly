@@ -86,6 +86,21 @@ export async function notify(title: string, body: string): Promise<void> {
   }
 }
 
+/** The keychain outlives the web view's storage, so ask it what it holds. */
+export async function keyHint(provider: string): Promise<string> {
+  if (!isNative) return "";
+  return invoke<string>("secret_hint", { provider });
+}
+
+/**
+ * True while films are rehearsed by the bundled script instead of being filmed
+ * by pi: no shell, the `demo` flag, or no key yet.
+ */
+export function simulates(settings: { keyHint: string }): boolean {
+  const demo = typeof location !== "undefined" && new URLSearchParams(location.search).has("demo");
+  return !isNative || demo || !settings.keyHint;
+}
+
 export async function saveKey(provider: string, key: string): Promise<string> {
   if (!isNative) return key.slice(-4);
   return invoke<string>("secret_set", { provider, key });

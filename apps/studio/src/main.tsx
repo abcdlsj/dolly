@@ -8,7 +8,7 @@ import { realClock, type Director } from "./agent/director.ts";
 import { PiDirector } from "./agent/pi.ts";
 import { SimulatedDirector } from "./agent/simulated.ts";
 import { liveShot, shotNumber, Store, type Snapshot } from "./model/store.ts";
-import { channel, dolly, hidePanel, isNative, notify, openPanel, quit, route, setTrayTitle, spawnPi } from "./platform.ts";
+import { channel, dolly, hidePanel, isNative, keyHint, notify, openPanel, quit, route, setTrayTitle, simulates, spawnPi } from "./platform.ts";
 import { Film } from "./screens/Film.tsx";
 import { Library } from "./screens/Library.tsx";
 import { NewFilm } from "./screens/NewFilm.tsx";
@@ -31,6 +31,14 @@ function load(store: Store): void {
   }
 }
 
+// The key lives in the keychain, which outlives the web view: a window that
+// starts with empty storage must not go on rehearsing while a key is right there.
+async function adoptKeyHint(store: Store): Promise<void> {
+  if (store.settings.keyHint) return;
+  const hint = await keyHint(store.settings.provider).catch(() => "");
+  if (hint) store.updateSettings({ keyHint: hint });
+}
+
 function save(store: Store): () => void {
   let timer: ReturnType<typeof setTimeout> | undefined;
   return store.subscribe(() => {
@@ -45,10 +53,9 @@ function save(store: Store): () => void {
   });
 }
 
-/** Simulated runs until the app has a key; with one, pi does the real work. Adding a key switches over. */
+/** A film is rehearsed until the app has a key; with one, pi does the real work. */
 function direct(store: Store): void {
-  const demo = new URLSearchParams(location.search).has("demo");
-  const wantsPi = () => isNative && !demo && !!store.settings.keyHint;
+  const wantsPi = () => !simulates(store.settings);
   let usingPi = wantsPi();
   const make = (): Director => (usingPi ? new PiDirector(spawnPi, realClock, () => dolly.run(["release"]).then(() => {})) : new SimulatedDirector());
   let stop = make().attach(store);
@@ -167,6 +174,7 @@ function start(): void {
   if (panel === "main") {
     const store = new Store();
     load(store);
+    void adoptKeyHint(store);
     save(store);
     announce(store);
     direct(store);

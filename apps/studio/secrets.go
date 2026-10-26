@@ -51,9 +51,22 @@ func secretSet(provider, key string) (string, error) {
 		}
 		return "", errors.New(message)
 	}
+	return last4(key), nil
+}
+
+// secretHint is the stored key's last four characters, or "" when there is none.
+func secretHint(provider string) string {
+	key, ok := secret(provider)
+	if !ok {
+		return ""
+	}
+	return last4(key)
+}
+
+func last4(key string) string {
 	runes := []rune(key)
 	if len(runes) > 4 {
 		runes = runes[len(runes)-4:]
 	}
-	return string(runes), nil
+	return string(runes)
 }

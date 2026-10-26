@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { liveShot, needsYou, progress, statusLine } from "../model/store.ts";
 import type { Film } from "../model/types.ts";
 import { useSnapshot, useStudio } from "../state.tsx";
-import { openPanel } from "../platform.ts";
+import { openPanel, simulates } from "../platform.ts";
 import { Gear, Plus, Search } from "../ui/icons.tsx";
 import { Menu, type MenuItem } from "../ui/menu.tsx";
 import { clock } from "../ui/film.tsx";
@@ -19,7 +19,7 @@ const FILTERS: { id: Filter; name: string }[] = [
 ];
 
 export function Library({ onOpen, onNew }: { onOpen: (film: Film) => void; onNew: () => void }) {
-  const { films } = useSnapshot();
+  const { films, settings } = useSnapshot();
   const studio = useStudio();
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
@@ -45,6 +45,11 @@ export function Library({ onOpen, onNew }: { onOpen: (film: Film) => void; onNew
     <div className="window">
       <header className="toolbar inset" data-drag-region>
         <span className="title" style={{ width: 120 }}>Films</span>
+        {simulates(settings) && (
+          <span className="mute" style={{ fontSize: 11 }} title="These films are rehearsed by a bundled script. Add an AI key in Settings and Dolly films the real app.">
+            Demo
+          </span>
+        )}
         <span className="spacer" />
         {films.length > 0 && (
           <div className="seg" role="tablist" aria-label="Filter">
