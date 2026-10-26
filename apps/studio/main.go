@@ -52,6 +52,8 @@ func main() {
 	studio.openWindows()
 	studio.openTray(trayIcon)
 
+	go studio.ensureService()
+
 	app.Event.OnApplicationEvent(events.Mac.ApplicationShouldHandleReopen, func(*application.ApplicationEvent) {
 		studio.showWindow("main")
 	})

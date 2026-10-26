@@ -102,12 +102,20 @@ export const dolly: DollyClient = isNative ? { run: (argv) => invoke<Output>("do
 export interface Permissions {
   screen: boolean;
   accessibility: boolean;
+  /** Why Accessibility cannot be answered: dolly itself did not run. */
+  problem?: string;
 }
 
 export async function permissions(): Promise<Permissions> {
   if (!isNative) return { screen: true, accessibility: true };
-  const [screen, accessibility] = await Promise.all([invoke<boolean>("screen_access"), trusted(dolly).catch(() => false)]);
-  return { screen, accessibility };
+  const screen = await invoke<boolean>("screen_access").catch(() => false);
+  try {
+    return { screen, accessibility: await trusted(dolly) };
+  } catch (error) {
+    // A build without `dolly` next to it cannot answer, and saying "not allowed"
+    // would send the person to a System Settings row that will never appear.
+    return { screen, accessibility: false, problem: error instanceof Error ? error.message : String(error) };
+  }
 }
 
 /** Asks macOS for the permission, then opens its pane in System Settings. */

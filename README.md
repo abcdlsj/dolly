@@ -191,6 +191,7 @@ $ bun run typecheck
 $ bun packages/cli/src/main.ts camera --shot shot.json --explain
 $ swift build --package-path drivers/macos      # on a Mac
 $ cd apps/studio && bun run build && go run .   # the desktop app, unbundled
+                                                # (DOLLY_BIN=… for the CLI it needs)
 $ cd apps/studio && bun run build:mac           # or Dolly.app, signed
 ```
 

@@ -20,7 +20,12 @@ func runDolly(argv []string) (any, error) {
 	path := searchPath()
 	binary := findOnPath(path, "dolly")
 	if binary == "" {
-		return nil, errors.New("dolly is missing from the app bundle")
+		// A run from source has no sidecar next to it; DOLLY_BIN points at a
+		// built one, usually the installed Dolly.app's CLI.
+		binary = os.Getenv("DOLLY_BIN")
+	}
+	if binary == "" {
+		return nil, errors.New("dolly is missing from the app bundle (set DOLLY_BIN for a run from source)")
 	}
 	// A dolly that hangs must end, or every later call waits behind it.
 	ctx, cancel := context.WithTimeout(context.Background(), dollyTimeout)

@@ -64,7 +64,9 @@ export function Onboarding() {
               <span className={step.done ? "mark done" : "mark"} aria-hidden="true">{step.done ? "✓" : index + 1}</span>
               <span style={{ flex: "1 1 auto", display: "flex", flexDirection: "column", gap: 2 }}>
                 <span style={{ fontWeight: 500 }}>{step.name}</span>
-                <span className="mute" style={{ fontSize: 12 }}>{step.detail}</span>
+                <span className="mute" style={{ fontSize: 12 }}>
+                  {step.name === "Accessibility" && allowed.problem ? allowed.problem : step.detail}
+                </span>
               </span>
               {step.done ? (
                 <span className="mute" style={{ fontSize: 12 }}>{index === 2 ? `•••• ${settings.keyHint}` : "Allowed"}</span>

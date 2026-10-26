@@ -86,6 +86,18 @@ func (s *Studio) Invoke(command string, args map[string]any) (any, error) {
 	return nil, fmt.Errorf("unknown command %q", command)
 }
 
+// ensureService registers the driver with launchd. Accessibility belongs to a
+// process, and a driver started by a shell inherits the shell's identity, so
+// its events are dropped: without its own process, `trust` has nothing to
+// grant and the privacy pane never lists Dolly. `dolly service start` is
+// idempotent, so a second Studio does not disturb a running one.
+func (s *Studio) ensureService() {
+	if _, err := s.dolly([]string{"service", "start"}); err != nil {
+		// An unbundled run has no `dolly` next to it; the onboarding says so.
+		return
+	}
+}
+
 func (s *Studio) quit() {
 	s.agents.killAll()
 	if s.app != nil {
