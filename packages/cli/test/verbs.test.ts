@@ -137,6 +137,36 @@ describe("apps and windows", () => {
     expect(await run(["snap"], fakeContext())).toMatchObject({ ok: false, code: 2 });
   });
 
+  test("trust --screen asks the driver about Screen Recording", async () => {
+    const ctx = fakeContext();
+    expect(await run(["trust", "--screen", "--prompt", "--wait", "5"], ctx)).toMatchObject({ ok: true, trusted: true });
+    expect(ctx.driver.of("trust")[0]).toEqual({ prompt: true, wait: 5, screen: true });
+    await run(["trust"], ctx);
+    expect(ctx.driver.of("trust")[1]).toEqual({});
+  });
+
+  test("scrollshot scrolls to the top, steps down until the view stops, and stitches", async () => {
+    const ctx = fakeContext();
+    const out = await run(["scrollshot", "61527", "long.png", "--crop", "0,40,300,700", "--step", "5"], ctx);
+    expect(out).toMatchObject({ ok: true, window: 61527, file: "/tmp/long.png", frames: 4, reachedEnd: true, pixels: [600, 2000] });
+    const stills = ctx.driver.of("still");
+    expect(stills).toHaveLength(5);
+    expect(stills.every((s) => s.max === 0)).toBe(true);
+    const stitches = ctx.driver.of("stitch");
+    // Window is 1280pt and the fake still 2560px wide: crop and trim arrive in pixels.
+    expect(stitches[0]!.crop).toEqual([0, 80, 600, 1400]);
+    expect(stitches[0]!.trim).toEqual([48, 48]);
+    expect(stitches.at(-1)).toMatchObject({ out: "/tmp/long.png", chrome: false });
+    expect(stitches.at(-1)!.files).toHaveLength(4);
+    const scrolls = ctx.driver.of("input").flatMap((i) => i.steps).filter((s) => s.type === "scroll");
+    expect(scrolls[0]).toMatchObject({ dy: 100 });
+    expect(scrolls.at(-1)).toMatchObject({ dy: -5 });
+    // Every frame is shot with the pointer parked right of the view.
+    const pointer = ctx.driver.screen.pointer;
+    expect(pointer).toEqual({ x: 200 + 340, y: 120 + 390 });
+    expect(await run(["scrollshot", "61527", "long.png"], fakeContext())).toMatchObject({ ok: false, code: 2 });
+  });
+
   test("launch --isolated moves HOME into a profile and waits for the window", async () => {
     const profile = mkdtempSync(join(tmpdir(), "dolly-profile-"));
     const ctx = fakeContext();

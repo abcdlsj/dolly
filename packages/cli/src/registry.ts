@@ -3,7 +3,7 @@
 
 import { click, drag, hover, key, move, path, release, scroll, type } from "./verbs/input.ts";
 import { controls, find, focus, launch, place, press, quit, resize, tree } from "./verbs/apps.ts";
-import { capture, record, snap } from "./verbs/capture.ts";
+import { capture, record, scrollshot, snap } from "./verbs/capture.ts";
 import { camera } from "./verbs/camera.ts";
 import { events } from "./verbs/events.ts";
 import { service } from "./verbs/service.ts";
@@ -14,7 +14,7 @@ export const VERBS = {
   move, path, hover, click, drag, scroll, key, type, release,
   press, find, controls, tree, focus, place, resize,
   front, windows, trust,
-  launch, quit, snap,
+  launch, quit, snap, scrollshot,
   record, capture, events, camera,
   service,
 };

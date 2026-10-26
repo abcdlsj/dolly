@@ -40,6 +40,11 @@ The installer signs with an Apple Development identity when one exists, so the
 grant survives rebuilds. Ad-hoc signing works too, but macOS then asks again
 after every rebuild — use `DOLLY_SIGN_IDENTITY` to pin an identity.
 
+Screen Recording is checked against the binary itself, so after a rebuild
+`dolly trust --screen` can report `false` while Accessibility still holds.
+macOS asks only once per app: run `tccutil reset ScreenCapture
+dev.abcdlsj.dolly`, then `dolly trust --screen --prompt`, and switch it on.
+
 ## Why a service
 
 Accessibility belongs to a process. A driver started by a shell inherits the
@@ -68,13 +73,14 @@ still goes one call at a time.
 | `find <pid> <label>` | list matching controls, to aim a press |
 | `front` | frontmost app (pid, name, bundle) |
 | `windows` | window ids and frames |
-| `trust` | Accessibility state, `--prompt` to ask |
+| `trust` | Accessibility state, `--screen` for Screen Recording, `--prompt` to ask |
 | `service start\|stop\|status` | the launchd-hosted driver service |
 | `record <windowID> <dir> <seconds>` | window-only frames for a camera move |
 | `capture <windowID> <out.mov> <seconds>` | one window as video, at the display's frame rate |
 | `launch <app> [--isolated [dir]]` | start an app — with `--isolated`, a second copy with its own home — and wait for its window |
 | `quit <pid>` | quit it again (`--force` if it hangs) |
 | `snap <windowID\|--pid n> <out.png>` | one frame of a window to look at, with the `scale` back to screen points |
+| `scrollshot <windowID> <out.png> --crop x,y,w,h` | scroll one view top to bottom and stitch it into one tall PNG (`--chrome` keeps what is above and below it) |
 | `tree <pid>` | the window's controls: role, texts, actions, screen frame, `center` and shot-file `rect` |
 | `events start <file>\|stop\|status` | log input and capture times during a take; `stop` returns them as beats |
 | `release` | lift every mouse button and modifier key, e.g. after a take is stopped mid-drag |

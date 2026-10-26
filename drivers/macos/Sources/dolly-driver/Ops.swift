@@ -28,6 +28,20 @@ enum Ops {
     static func run(_ op: String, _ p: Params) throws -> [String: Any] {
         switch op {
         case "trust":
+            if p.bool("screen") {
+                // Screen Recording is granted per process like Accessibility,
+                // and checked against the binary itself, so a rebuild can need
+                // it again while Accessibility carries over.
+                guard p.bool("prompt") else { return ["trusted": CGPreflightScreenCaptureAccess()] }
+                _ = CGRequestScreenCaptureAccess()
+                let deadline = Date().addingTimeInterval(p.double("wait", 60))
+                var waited = 0.0
+                while Date() < deadline, !CGPreflightScreenCaptureAccess() {
+                    Thread.sleep(forTimeInterval: 0.5)
+                    waited += 0.5
+                }
+                return ["trusted": CGPreflightScreenCaptureAccess(), "waited": waited]
+            }
             guard p.bool("prompt") else { return ["trusted": Accessibility.trusted()] }
             // The system prompt is attributed to this process, so stay alive
             // while it is on screen; exiting closes it before the grant lands.
@@ -110,6 +124,17 @@ enum Ops {
 
         case "still":
             return try Capture.still(windowID: try p.int("window"), file: URL(fileURLWithPath: try p.string("file")), longest: Int(p.double("max", 0)))
+
+        case "stitch":
+            let crop = (p.raw["crop"] as? [NSNumber])?.map(\.intValue)
+            let trim = (p.raw["trim"] as? [NSNumber])?.map(\.intValue) ?? [0, 0]
+            return try Stitch.run(
+                files: p.strings("files"),
+                crop: crop,
+                trim: (trim.first ?? 0, trim.count > 1 ? trim[1] : trim.first ?? 0),
+                out: p.has("out") ? try p.string("out") : nil,
+                chrome: p.bool("chrome")
+            )
 
         case "launch":
             return try Apps.launch(

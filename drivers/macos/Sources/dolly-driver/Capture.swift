@@ -59,11 +59,17 @@ enum Capture {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: binary)
         process.arguments = arguments
+        let errors = Pipe()
         process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
+        process.standardError = errors
         try process.run()
         process.waitUntilExit()
-        guard process.terminationStatus == 0 else { throw Failure(failure, code: .failed) }
+        guard process.terminationStatus == 0 else {
+            // Say what the tool said: "not granted" and "no such window" call for different fixes.
+            let said = String(decoding: errors.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            throw Failure(said.isEmpty ? failure : "\(failure) (\(said))", code: .failed)
+        }
     }
 
     private static func milliseconds(_ date: Date) -> Int {

@@ -70,8 +70,11 @@ export interface Control {
 
 /** Every op, its params and its result. The driver implements exactly these. */
 export interface Ops {
-  /** Whether input from this process reaches the system; `prompt` asks the user and waits up to `wait` s. */
-  trust: { params: { prompt?: boolean; wait?: number }; result: { trusted: boolean; waited?: number } };
+  /**
+   * Whether input from this process reaches the system, or with `screen`
+   * whether it may capture windows; `prompt` asks the user and waits up to `wait` s.
+   */
+  trust: { params: { prompt?: boolean; wait?: number; screen?: boolean }; result: { trusted: boolean; waited?: number } };
   front: { params: Record<string, never>; result: App };
   /** Front to back, as the window server stacks them. `layer: null` lists every layer. */
   windows: { params: { pid?: number; layer?: number | null }; result: { windows: Window[] } };
@@ -103,6 +106,18 @@ export interface Ops {
   };
   /** One shadowless PNG of a window, downscaled so its longest side is at most `max` (0 keeps it). */
   still: { params: { window: number; file: string; max: number }; result: { pixels: [number, number] } };
+  /**
+   * Joins frames of one scrolling view into one tall PNG. `crop` is the
+   * view's rectangle in pixels, `trim` the [top, bottom] bands kept out of
+   * matching and seams, `chrome` keeps what lies above and below the crop.
+   * `offsets[i]` is how many pixels frame i moved past frame i - 1, and
+   * `costs[i]` how well they matched (0 is identical). Without `out` it only
+   * measures.
+   */
+  stitch: {
+    params: { files: string[]; crop?: [number, number, number, number]; trim?: [number, number]; out?: string; chrome?: boolean };
+    result: { offsets: number[]; costs: number[]; pixels?: [number, number]; used?: number };
+  };
 
   /**
    * Starts an app by path, bundle id or name. `environment` is added to its
@@ -124,7 +139,7 @@ export const OPS = [
   "trust", "front", "windows", "pointer", "input",
   "find", "press", "controls", "tree",
   "activate", "place", "resize",
-  "video", "frames", "still",
+  "video", "frames", "still", "stitch",
   "launch", "quit",
 ] as const satisfies readonly Op[];
 

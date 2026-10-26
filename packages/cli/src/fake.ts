@@ -34,6 +34,8 @@ export const MARGIN: FakeScreen = {
 
 export class FakeDriver implements Driver {
   readonly calls: { op: Op; params: unknown }[] = [];
+  /** How many times a scrollshot has measured a scroll. */
+  scrolls = 0;
   screen: FakeScreen;
 
   constructor(screen: Partial<FakeScreen> = {}) {
@@ -93,6 +95,12 @@ export class FakeDriver implements Driver {
         return { started: 1_700_000_000_000, frames: Math.round(p.seconds * 60), seconds: p.seconds };
       case "still":
         return { pixels: p.max ? [Math.min(p.max, 2560), Math.round((Math.min(p.max, 2560) * 1600) / 2560)] : [2560, 1600] };
+      case "stitch": {
+        // The fake view scrolls three times, then stops.
+        const offsets = p.files.map((_: string, i: number) => (i === 0 ? 0 : this.scrolls < 3 ? 200 : 0));
+        if (!p.out) this.scrolls++;
+        return { offsets, costs: offsets.map(() => 0), ...(p.out ? { pixels: [600, 2000], used: p.files.length } : {}) };
+      }
       case "launch":
         return { pid: 4711, app: `/Applications/${p.app}.app`, bundle: "app.margin.notes", sandboxed: false };
       case "quit":

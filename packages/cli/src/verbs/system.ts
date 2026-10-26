@@ -23,8 +23,9 @@ export const windows = verb({
 
 export const trust = verb({
   name: "trust",
-  summary: "report Accessibility trust, optionally ask for it",
-  usage: "dolly trust [--prompt [--wait 60]]",
-  parse: (args) => ({ prompt: args.flag("prompt"), wait: args.number("wait", 60) }),
-  run: ({ prompt, wait }, ctx) => ctx.driver.call("trust", prompt ? { prompt, wait } : {}),
+  summary: "report Accessibility trust (or Screen Recording with --screen), optionally ask for it",
+  usage: "dolly trust [--screen] [--prompt [--wait 60]]",
+  parse: (args) => ({ prompt: args.flag("prompt"), wait: args.number("wait", 60), screen: args.flag("screen") }),
+  run: ({ prompt, wait, screen }, ctx) =>
+    ctx.driver.call("trust", { ...(prompt ? { prompt, wait } : {}), ...(screen ? { screen } : {}) }),
 });
